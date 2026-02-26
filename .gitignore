@@ -1,0 +1,7 @@
+# Build artifacts
+main
+*.exe
+
+# Internal planning / tracking
+prd.json
+progress.txt
