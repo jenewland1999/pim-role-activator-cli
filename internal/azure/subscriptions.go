@@ -4,12 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 )
+
+// maxResponseBytes is the upper bound on response body size (10 MiB) to
+// prevent out-of-memory conditions from unexpectedly large API responses.
+const maxResponseBytes = 10 << 20
 
 // SubscriptionInfo holds the ID and display name of an Azure subscription
 // as returned by the ARM subscriptions list API.
@@ -53,7 +58,7 @@ func FetchSubscriptions(ctx context.Context, cred azcore.TokenCredential) ([]Sub
 			DisplayName    string `json:"displayName"`
 		} `json:"value"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBytes)).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decoding subscriptions response: %w", err)
 	}
 
