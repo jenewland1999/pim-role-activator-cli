@@ -80,14 +80,14 @@ func Load(dir string) (*UserConfig, error) {
 
 // Save serialises cfg to disk inside dir, creating the directory if needed.
 func Save(dir string, cfg *UserConfig) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, configFile), data, 0o644)
+	return os.WriteFile(filepath.Join(dir, configFile), data, 0o600)
 }
 
 // Exists reports whether a config file is present in dir.

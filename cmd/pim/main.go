@@ -36,7 +36,7 @@ func pimDir() string {
 		os.Exit(1)
 	}
 	dir := filepath.Join(home, ".pim")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not create %s: %v\n", dir, err)
 	}
 	return dir

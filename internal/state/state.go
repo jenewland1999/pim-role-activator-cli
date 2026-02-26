@@ -53,7 +53,7 @@ func (s *Store) Save(records []model.ActivationRecord) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.Path, data, 0o644)
+	return os.WriteFile(s.Path, data, 0o600)
 }
 
 // Append loads existing records, merges new ones, prunes expired entries and saves.
