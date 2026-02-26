@@ -53,6 +53,10 @@ func runStatus(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
+	if len(cfg.Subscriptions) == 0 {
+		return fmt.Errorf("no subscriptions configured — run 'pim setup' to configure your subscriptions")
+	}
+
 	re, reErr := cfg.ParsedScopePattern()
 	if reErr != nil {
 		return fmt.Errorf("invalid scope_pattern in config: %w", reErr)
@@ -108,6 +112,10 @@ func runActivate(_ *cobra.Command, _ []string) error {
 	cfg, err := config.Load(dir)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if len(cfg.Subscriptions) == 0 {
+		return fmt.Errorf("no subscriptions configured — run 'pim setup' to configure your subscriptions")
 	}
 
 	// Compile the optional scope_pattern regexp once; nil means no App/Env columns.
