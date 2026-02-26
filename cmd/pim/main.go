@@ -30,7 +30,12 @@ var (
 
 // pimDir returns ~/.pim/ and ensures the directory exists.
 func pimDir() string {
-	dir := filepath.Join(os.Getenv("HOME"), ".pim")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: could not determine home directory: %v\n", err)
+		os.Exit(1)
+	}
+	dir := filepath.Join(home, ".pim")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not create %s: %v\n", dir, err)
 	}
