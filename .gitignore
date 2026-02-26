@@ -1,6 +1,24 @@
-# Build artifacts
+# Build artefacts
 main
+pim
 *.exe
+dist/
+
+# Test & coverage output
+*.test
+coverage.out
+coverage.html
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Internal planning / tracking
 prd.json
