@@ -2,17 +2,17 @@ package azure
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // TokenClaims holds the subset of JWT claims we care about.
 type TokenClaims struct {
+	jwt.RegisteredClaims
+
 	// UPN / login name (present for interactive user sessions)
 	UPN              string `json:"upn"`
 	UniqueName       string `json:"unique_name"`
@@ -34,7 +34,28 @@ func (c *TokenClaims) DisplayName() string {
 }
 
 // GetTokenClaims obtains an ARM access token via cred and decodes the JWT
-// payload claims without signature verification (we trust our own token).
+// payload claims.
+//
+// # Security: JWT Trust Boundary
+//
+// This function uses [jwt.Parser.ParseUnverified] — the token's cryptographic
+// signature is NOT verified. This is acceptable here because:
+//
+//  1. The token is obtained directly from [azcore.TokenCredential.GetToken],
+//     which retrieves it over TLS from Microsoft Entra ID (Azure AD). We are
+//     the original requester, not a relying party receiving the token from an
+//     external source.
+//  2. Verifying the signature would require fetching Entra's OIDC discovery
+//     document and JWKS keys, adding network round-trips and complexity with
+//     no security benefit in this context.
+//  3. The extracted claims are used only for display purposes (greeting the
+//     user) and as a suggested principal ID during setup — never for
+//     authorization decisions.
+//
+// WARNING: Do NOT reuse this function with tokens received from untrusted
+// sources (e.g. user input, incoming HTTP requests, third-party services).
+// In those scenarios full signature verification against Entra's JWKS
+// endpoint is required.
 func GetTokenClaims(ctx context.Context, cred azcore.TokenCredential) (*TokenClaims, error) {
 	tok, err := cred.GetToken(ctx, policy.TokenRequestOptions{
 		Scopes: []string{"https://management.azure.com/.default"},
@@ -43,19 +64,9 @@ func GetTokenClaims(ctx context.Context, cred azcore.TokenCredential) (*TokenCla
 		return nil, fmt.Errorf("acquiring token: %w", err)
 	}
 
-	// JWT is three base64url sections separated by '.'
-	parts := strings.SplitN(tok.Token, ".", 3)
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("unexpected token format")
-	}
-
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return nil, fmt.Errorf("decoding token payload: %w", err)
-	}
-
 	var claims TokenClaims
-	if err := json.Unmarshal(payload, &claims); err != nil {
+	parser := jwt.NewParser()
+	if _, _, err := parser.ParseUnverified(tok.Token, &claims); err != nil {
 		return nil, fmt.Errorf("parsing token claims: %w", err)
 	}
 	return &claims, nil
