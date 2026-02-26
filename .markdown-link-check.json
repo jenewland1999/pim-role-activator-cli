@@ -1,0 +1,10 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^https://github.com/jenewland1999/pim-role-activator-cli/releases"
+    }
+  ],
+  "aliveStatusCodes": [200, 206, 301, 302, 403, 429],
+  "retryOn429": true,
+  "timeout": "10s"
+}
