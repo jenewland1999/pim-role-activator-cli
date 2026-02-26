@@ -24,9 +24,12 @@ import (
 )
 
 var (
-	dryRun  bool
-	noCache bool
+	dryRun     bool
+	noCache    bool
+	apiTimeout time.Duration
 )
+
+const defaultAPITimeout = 2 * time.Minute
 
 // pimDir returns ~/.pim/ and ensures the directory exists.
 func pimDir() string {
@@ -45,7 +48,8 @@ func pimDir() string {
 // ── Status mode ───────────────────────────────────────────────────────────────
 
 func runStatus(_ *cobra.Command, _ []string) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+	defer cancel()
 	dir := pimDir()
 
 	cfg, err := config.Load(dir)
@@ -106,7 +110,8 @@ func runStatus(_ *cobra.Command, _ []string) error {
 // ── Activate mode ─────────────────────────────────────────────────────────────
 
 func runActivate(_ *cobra.Command, _ []string) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+	defer cancel()
 	dir := pimDir()
 
 	cfg, err := config.Load(dir)
@@ -448,6 +453,8 @@ Run this to add subscriptions, change your principal ID, or update group-select 
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+
+	rootCmd.PersistentFlags().DurationVar(&apiTimeout, "timeout", defaultAPITimeout, "Timeout for Azure API calls (e.g. 30s, 2m, 5m)")
 
 	rootCmd.AddCommand(activateCmd, setupCmd)
 

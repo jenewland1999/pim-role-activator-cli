@@ -1,6 +1,6 @@
 # Build artefacts
-main
-pim
+/main
+/pim
 *.exe
 dist/
 
