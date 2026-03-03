@@ -2,13 +2,12 @@ package azure
 
 import (
 	"context"
-	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/jenewland1999/pim-role-activator-cli/internal/model"
 )
@@ -23,12 +22,14 @@ func ActivateRoles(
 	principalID string,
 	justification string,
 	duration model.DurationOption,
-) ([]model.ActivationResult, error) {
+) []model.ActivationResult {
 	results := make([]model.ActivationResult, len(roles))
-	g, ctx := errgroup.WithContext(ctx)
+	var wg sync.WaitGroup
 
 	for i, role := range roles {
-		g.Go(func() error {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			requestID := uuid.New().String()
 			startTime := time.Now().UTC()
 
@@ -50,13 +51,9 @@ func ActivateRoles(
 
 			_, err := client.Create(ctx, role.Scope, requestID, req, nil)
 			results[i] = model.ActivationResult{Role: role, Err: err}
-			// Return nil so the errgroup doesn't cancel sibling requests on failure.
-			return nil
-		})
+		}()
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, fmt.Errorf("activation group error: %w", err)
-	}
-	return results, nil
+	wg.Wait()
+	return results
 }

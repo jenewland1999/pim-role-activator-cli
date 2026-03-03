@@ -326,10 +326,7 @@ func runActivate(_ *cobra.Command, _ []string) error {
 
 	// ── Parallel activation ───────────────────────────────────────────────────
 	fmt.Println()
-	results, err := azure.ActivateRoles(ctx, activationClients.Activation, selectedRoles, cfg.PrincipalID, justification, duration)
-	if err != nil {
-		return fmt.Errorf("activation error: %w", err)
-	}
+	results := azure.ActivateRoles(ctx, activationClients.Activation, selectedRoles, cfg.PrincipalID, justification, duration)
 
 	// ── Persist state ─────────────────────────────────────────────────────────
 	storeFile := filepath.Join(dir, "activations.json")

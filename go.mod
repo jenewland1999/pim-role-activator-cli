@@ -13,7 +13,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/sync v0.19.0
 )
 
 require (
