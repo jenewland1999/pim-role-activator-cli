@@ -102,8 +102,8 @@ pim-role-activator-cli/
 │  Azure ARM REST API │  │  Local Storage        │
 │  (management.azure  │  │  (~/.pim/)            │
 │  .com) via SDK      │  │                       │
-│                     │  │  eligible-roles.json  │
-│  • roleEligibility  │  │  cache-meta           │
+│                     │  │  eligible-roles-data.json │
+│  • roleEligibility  │  │  eligible-roles-meta.json │
 │    ScheduleInstances│  │  activations.json     │
 │  • roleAssignment   │  │                       │
 │    ScheduleInstances│  └───────────────────────┘
@@ -149,7 +149,7 @@ pim-role-activator-cli/
 7. tui.PrintSummary()
 8. If --dry-run → exit
 9. huh confirm prompt (y/N)
-10. azure.ActivateRoles() — parallel with errgroup.Group
+10. azure.ActivateRoles() — parallel with sync.WaitGroup
     a. uuid.New() for each request ID
     b. PUT roleAssignmentScheduleRequests/{uuid}
 11. state.Save() — prune expired + append new entries → activations.json
@@ -158,31 +158,29 @@ pim-role-activator-cli/
 
 ## Component Inventory
 
-| Package             | File(s)         | Responsibility                                            |
-| ------------------- | --------------- | --------------------------------------------------------- |
-| `cmd/pim`           | `main.go`       | cobra wiring, flag definitions, top-level orchestration   |
-| `internal/azure`    | `client.go`     | Azure SDK client factory, DefaultAzureCredential          |
-| `internal/azure`    | `eligible.go`   | Fetch eligible roles, map → model.Role, decode RG name    |
-| `internal/azure`    | `active.go`     | Fetch active assignments, map → model.ActiveRole          |
-| `internal/azure`    | `activate.go`   | SelfActivate PUT, parallel via errgroup                   |
-| `internal/cache`    | `cache.go`      | File-based 24h TTL cache (eligible-roles.json + meta)     |
-| `internal/config`   | `config.go`     | Subscription ID, principal ID, scope, cache TTL           |
-| `internal/model`    | `role.go`       | Role, ActiveRole, DurationOption, ActivationResult types  |
-| `internal/model`    | `activation.go` | ActivationRecord type                                     |
-| `internal/model`    | `rgname.go`     | DecodeEnv(), DecodeAppCode() — case-insensitive           |
-| `internal/state`    | `state.go`      | activations.json read / prune-expired / append / write    |
-| `internal/tui`      | `selector.go`   | Bubbletea role selector with rowRender pre-render cache   |
-| `internal/tui`      | `duration.go`   | Bubbletea duration picker                                 |
-| `internal/tui`      | `loader.go`     | Spinner wrapper (RunWithSpinner) for blocking API calls   |
-| `internal/tui`      | `status.go`     | PrintStatus, PrintSummary, PrintResults, PrintBanner      |
-| `internal/tui`      | `styles.go`     | Lipgloss styles, helper render funcs (Bold, Dim, etc.)    |
+- `cmd/pim` (`main.go`) — cobra wiring, flag definitions, top-level orchestration
+- `internal/azure` (`client.go`) — Azure SDK client factory, DefaultAzureCredential
+- `internal/azure` (`eligible.go`) — fetch eligible roles, map to `model.Role`, decode RG name
+- `internal/azure` (`active.go`) — fetch active assignments, map to `model.ActiveRole`
+- `internal/azure` (`activate.go`) — SelfActivate PUT, parallel via `sync.WaitGroup`
+- `internal/cache` (`cache.go`) — file-based TTL cache (`prefix-data.json` + `prefix-meta.json`)
+- `internal/config` (`config.go`) — principal/subscription configuration, validation, cache TTL
+- `internal/model` (`role.go`) — `Role`, `ActiveRole`, `DurationOption`, `ActivationResult`
+- `internal/model` (`activation.go`) — `ActivationRecord`
+- `internal/model` (`rgname.go`) — scope decoding via regexp capture groups
+- `internal/state` (`state.go`) — `activations.json` read, prune, append, write
+- `internal/tui` (`selector.go`) — Bubbletea role selector with pre-render cache
+- `internal/tui` (`duration.go`) — Bubbletea duration picker
+- `internal/tui` (`loader.go`) — spinner wrapper for blocking API calls
+- `internal/tui` (`status.go`) — status, summary, and results rendering
+- `internal/tui` (`styles.go`) — Lipgloss styles and rendering helpers
 
 ## Data Flow
 
 ```text
 Eligible Roles API Response
     │
-    ├─ json.Marshal → ~/.pim/eligible-roles.json (24h TTL)
+    ├─ json.Marshal → ~/.pim/eligible-roles-data.json (configurable TTL)
     │
     ▼
 []model.Role (typed Go structs)
@@ -198,7 +196,7 @@ User Selections ([]model.Role where Selected == true)
     ├─ + model.DurationOption{ISO8601, Duration, Label}
     │
     ▼
-Parallel azure.ActivateRoles() (errgroup.Group)
+Parallel azure.ActivateRoles() (sync.WaitGroup)
     │
     ▼
 []model.ActivationResult → tui.PrintResults()
@@ -212,15 +210,15 @@ Parallel azure.ActivateRoles() (errgroup.Group)
 The interactive selector is built on [bubbletea](https://github.com/charmbracelet/bubbletea)
 and [lipgloss](https://github.com/charmbracelet/lipgloss):
 
-| Technique              | Purpose                                          |
-| ---------------------- | ------------------------------------------------ |
-| `tea.WithAltScreen()`  | Full-screen mode, restored automatically on exit |
-| `tea.KeyMsg`           | Keystroke handling (↑/↓/space/a/n/g/c/enter//)   |
-| `tea.WindowSizeMsg`    | Terminal resize → viewport recalculation         |
-| `lipgloss.Reverse()`   | Highlight cursor row uniformly                   |
-| `lipgloss.Faint()`     | Dim unselected rows                              |
-| `lipgloss.Green()`     | Selected (non-cursor) rows                       |
-| `bubbles/textinput`    | Search input with `Blink` command                |
+| Technique             | Purpose                                          |
+| --------------------- | ------------------------------------------------ |
+| `tea.WithAltScreen()` | Full-screen mode, restored automatically on exit |
+| `tea.KeyMsg`          | Keystroke handling (↑/↓/space/a/n/g/c/enter//)   |
+| `tea.WindowSizeMsg`   | Terminal resize → viewport recalculation         |
+| `lipgloss.Reverse()`  | Highlight cursor row uniformly                   |
+| `lipgloss.Faint()`    | Dim unselected rows                              |
+| `lipgloss.Green()`    | Selected (non-cursor) rows                       |
+| `bubbles/textinput`   | Search input with `Blink` command                |
 
 ### Rendering Strategy — Row Render Cache
 
@@ -228,12 +226,12 @@ Because `View()` is called on every keypress, all lipgloss rendering is done
 **once at startup** and stored in a `rowRender` cache (one entry per role,
 four pre-built strings per entry):
 
-| Field         | When used                                |
-| ------------- | ---------------------------------------- |
-| `normalUnsel` | Cursor elsewhere, role not selected      |
-| `normalSel`   | Cursor elsewhere, role selected          |
-| `cursorUnsel` | Cursor on this row, role not selected    |
-| `cursorSel`   | Cursor on this row, role selected        |
+| Field         | When used                             |
+| ------------- | ------------------------------------- |
+| `normalUnsel` | Cursor elsewhere, role not selected   |
+| `normalSel`   | Cursor elsewhere, role selected       |
+| `cursorUnsel` | Cursor on this row, role not selected |
+| `cursorSel`   | Cursor on this row, role selected     |
 
 `View()` for navigation (↑/↓) is a pure integer increment + slice lookups.
 Only selection changes (`Space`, `a`, `n`, `g`) trigger cache rebuilds
@@ -241,12 +239,12 @@ Only selection changes (`Space`, `a`, `n`, `g`) trigger cache rebuilds
 
 ## Error Handling
 
-| Scenario                  | Behaviour                                    |
-| ------------------------- | -------------------------------------------- |
-| Not authenticated         | SDK returns error → "run az login" message   |
-| API call fails            | Wrapped error returned to cobra → exit 1     |
-| No eligible roles         | Info message + exit 0                        |
-| No active roles (status)  | Info message + exit 0                        |
-| Empty justification       | huh validation rejects empty input           |
-| Activation fails (1 role) | Per-role error logged, remaining continue    |
-| User cancels TUI          | cancelled = true → "Cancelled." + exit 0     |
+| Scenario                  | Behaviour                                  |
+| ------------------------- | ------------------------------------------ |
+| Not authenticated         | SDK returns error → "run az login" message |
+| API call fails            | Wrapped error returned to cobra → exit 1   |
+| No eligible roles         | Info message + exit 0                      |
+| No active roles (status)  | Info message + exit 0                      |
+| Empty justification       | huh validation rejects empty input         |
+| Activation fails (1 role) | Per-role error logged, remaining continue  |
+| User cancels TUI          | cancelled = true → "Cancelled." + exit 0   |

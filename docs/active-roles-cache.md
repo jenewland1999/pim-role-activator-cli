@@ -39,10 +39,6 @@ The current table layout includes columns for App, Env, Scope, Role, Expires In,
 - **Responsive column selection** — detect terminal width and hide lower-priority columns automatically.
 - **Wrap long values** — allow cell content to wrap within a fixed column width.
 
-### No parallel subscription fetching
-
-Active roles are currently fetched serially per subscription. Parallelising this (PRD item 7.2) would further reduce the refresh time and compound well with caching.
-
 ## Cache files
 
 | File                            | Purpose                                                              |

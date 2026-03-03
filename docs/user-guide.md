@@ -24,10 +24,10 @@ pim activate --no-cache
 
 ### Prerequisites
 
-| Tool             | Install                                                                              | Purpose                    |
-| ---------------- | ------------------------------------------------------------------------------------ | -------------------------- |
-| Azure CLI (`az`) | [Install guide](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-macos) | Authentication             |
-| Go 1.22+         | [go.dev/dl](https://go.dev/dl/)                                                      | Build from source          |
+| Tool             | Install                                                                              | Purpose           |
+| ---------------- | ------------------------------------------------------------------------------------ | ----------------- |
+| Azure CLI (`az`) | [Install guide](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-macos) | Authentication    |
+| Go 1.25+         | [go.dev/dl](https://go.dev/dl/)                                                      | Build from source |
 
 ### Setup
 
@@ -40,13 +40,13 @@ go build -o pim ./cmd/pim
 sudo mv pim /usr/local/bin/pim
 ```
 
-2. Log in to Azure:
+1. Log in to Azure:
 
 ```bash
 az login
 ```
 
-3. Verify it works:
+1. Verify it works:
 
 ```bash
 pim
@@ -148,7 +148,7 @@ Step 3: Select activation duration
 
 A summary is shown before any API calls are made:
 
-```
+```text
 ─── Summary ────────────────────────────────────────────────────────────
   Roles:
     ▸ APP1  Prod  RG-PRD-APP1-001           Contributor
@@ -207,10 +207,8 @@ pim --help
 
 Eligible roles are cached for **24 hours** in `~/.pim/`:
 
-| File                  | Content                                  |
-| --------------------- | ---------------------------------------- |
-| `eligible-roles.json` | Serialised eligible roles (JSON)         |
-| `cache-meta`          | Unix timestamp of when cache was written |
+- `eligible-roles-data.json` — serialised eligible roles (JSON)
+- `eligible-roles-meta.json` — cache metadata with `written_at`
 
 The cache is automatically used when:
 
@@ -227,7 +225,7 @@ Using cached roles (1234m until refresh). Use --no-cache to bypass.
 To manually clear the cache:
 
 ```bash
-rm -rf ~/.pim/eligible-roles.json ~/.pim/cache-meta
+rm -rf ~/.pim/eligible-roles-data.json ~/.pim/eligible-roles-meta.json
 ```
 
 ---
@@ -272,7 +270,7 @@ This means the API returned no results. Possible causes:
 
 - You're logged in as the wrong account (`az account show`)
 - Your eligibility has expired
-- The subscription ID in `internal/config/config.go` is wrong
+- Config is stale or points to the wrong subscriptions (`pim setup`)
 - Try `--no-cache` to bypass a stale cache
 
 ### "Failed to activate"
@@ -288,10 +286,10 @@ The CLI continues activating remaining roles even if one fails.
 
 ### Wrong subscription or principal ID
 
-Edit the constants in `internal/config/config.go`:
+Re-run setup to refresh your saved config:
 
-```go
-const SubscriptionID = "your-subscription-id"
+```bash
+pim setup
 ```
 
 Find your object ID with:

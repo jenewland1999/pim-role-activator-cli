@@ -8,27 +8,31 @@ All data files live under `~/.pim/` (created automatically on first run):
 
 ```text
 ~/.pim/
-├── eligible-roles.json   # Cached API response (24h TTL)
-├── cache-meta            # Cache timestamp
+├── eligible-roles-data.json   # Cached eligible roles
+├── eligible-roles-meta.json   # Cache metadata (written_at)
+├── active-roles-data.json     # Cached active roles for status mode
+├── active-roles-meta.json     # Cache metadata (written_at)
 └── activations.json      # Local activation records
 ```
 
 ---
 
-## 1. eligible-roles.json
+## 1. eligible-roles-data.json
 
 **Source:** Cached response from the Azure ARM eligibility API.
 **Written by:** Activate mode (on cache miss or `--no-cache`).
 **Read by:** Activate mode (on cache hit).
 **TTL:** 24 hours (86400 seconds).
 
-This is the raw JSON response from:
+This file stores the CLI's internal eligible role projection (not the raw ARM payload).
+
+Data is derived from:
 
 ```text
 GET .../roleEligibilityScheduleInstances?$filter=asTarget()&api-version=2020-10-01
 ```
 
-### Schema
+### Eligible Roles Schema
 
 ```jsonc
 {
@@ -70,7 +74,7 @@ GET .../roleEligibilityScheduleInstances?$filter=asTarget()&api-version=2020-10-
 }
 ```
 
-### Example
+### Eligible Roles Example
 
 ```json
 {
@@ -110,30 +114,26 @@ GET .../roleEligibilityScheduleInstances?$filter=asTarget()&api-version=2020-10-
 
 ---
 
-## 2. cache-meta
+## 2. eligible-roles-meta.json
 
 **Source:** Written by the CLI after a successful API fetch.
-**Format:** Single line containing Unix epoch timestamp (seconds since 1970-01-01).
+**Format:** JSON object containing an RFC3339 timestamp.
 **Read by:** Activate mode to check cache freshness.
 
-### Schema
+### Eligible Roles Cache Meta Schema
 
-```
-{epoch_seconds}
-```
-
-### Example
-
-```
-1771931980
+```json
+{
+  "written_at": "2026-03-03T12:00:00Z"
+}
 ```
 
 ### Cache Logic
 
-```
-cache_age = current_epoch - cached_epoch
-if cache_age < 86400 (24h) AND --no-cache not set:
-    use cached eligible-roles.json
+```text
+cache_age = now - written_at
+if cache_age < cache_ttl_hours AND --no-cache not set:
+  use cached eligible-roles-data.json
 else:
     fetch from API, write both files
 ```
@@ -146,7 +146,7 @@ else:
 **Format:** JSON array of activation records.
 **Read by:** Status mode (to display justification for active roles).
 
-### Schema
+### Activation State Schema
 
 ```jsonc
 [
@@ -163,7 +163,7 @@ else:
 ]
 ```
 
-### Example
+### Activation State Example
 
 ```json
 [
@@ -190,7 +190,7 @@ else:
 
 Justification is looked up by the composite key:
 
-```
+```text
 key = scope + "|" + roleDefinitionId
 ```
 
@@ -205,7 +205,7 @@ Portal), the justification will show "—".
 
 Example resource group naming convention encoding environment and application:
 
-```
+```text
 XEZZZZCCCCZZNN
 │││   ││││
 │││   ││││
@@ -247,7 +247,7 @@ XEZZZZCCCCZZNN
 
 The JSON body sent to the activation PUT endpoint:
 
-### Schema
+### Activation Request Schema
 
 ```jsonc
 {
@@ -260,7 +260,7 @@ The JSON body sent to the activation PUT endpoint:
       "startDateTime": "string", // ISO 8601 UTC (e.g. "2026-02-24T12:00:00.000Z")
       "expiration": {
         "type": "AfterDuration", // Literal string
-        "duration": "string", // ISO 8601 duration (PT30M, PT1H, PT2H, PT4H)
+        "duration": "string", // ISO 8601 duration (e.g. PT30M, PT1H, PT8H)
       },
     },
   },
@@ -268,6 +268,9 @@ The JSON body sent to the activation PUT endpoint:
 ```
 
 ### Duration Mapping
+
+Duration choices are configurable via `durations` in `config.json`.
+When omitted, defaults are:
 
 | Label      | ISO 8601 | Seconds |
 | ---------- | -------- | ------- |
@@ -289,7 +292,7 @@ type ActivationRequest struct {
             StartDateTime string `json:"startDateTime"`
             Expiration    struct {
                 Type     string `json:"type"`     // always "AfterDuration"
-                Duration string `json:"duration"` // PT30M, PT1H, PT2H, PT4H
+                Duration string `json:"duration"` // e.g. PT30M, PT1H, PT8H
             } `json:"expiration"`
         } `json:"scheduleInfo"`
     } `json:"properties"`

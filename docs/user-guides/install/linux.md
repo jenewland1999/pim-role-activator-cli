@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux) — required for authentication
-- [Go 1.22+](https://go.dev/dl/) — required to build from source
+- [Go 1.25+](https://go.dev/dl/) — required to build from source
 
 ### Install Prerequisites
 

@@ -46,7 +46,7 @@ Detailed installation guides for each platform:
 | --------------------------------------------------------------------------------- | ------------------- |
 | [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) (`az`) | Authentication      |
 | Active Azure session (`az login`)                                                 | Token for API calls |
-| [Go 1.22+](https://go.dev/dl/) _(build from source only)_                         | Compile the binary  |
+| [Go 1.25+](https://go.dev/dl/) _(build from source only)_                         | Compile the binary  |
 
 ## Usage
 
@@ -54,11 +54,13 @@ Detailed installation guides for each platform:
 pim                 Show currently active PIM roles
 pim activate        Activate eligible PIM roles interactively
 pim setup           Re-run the configuration wizard
+pim version         Print version, Go runtime, and platform
 pim activate [flags]
 
 Flags:
   --dry-run       Walk through prompts without activating
   --no-cache      Bypass the 24-hour eligible role cache
+  --timeout       Timeout for Azure API calls (e.g. 30s, 2m, 5m)
   -h, --help      Show help
 ```
 
@@ -80,7 +82,7 @@ Interactive 3-step flow:
 
 1. **Select roles** — keyboard-driven multi-select list with search and group selection
 2. **Enter justification** — free text, sent to Azure audit logs
-3. **Choose duration** — 30 min, 1 hr, 2 hrs, or 4 hrs
+3. **Choose duration** — configurable via `durations` in config (defaults: 30m, 1h, 2h, 4h)
 
 A summary is shown before anything is activated. Roles are then activated in parallel.
 
@@ -139,38 +141,39 @@ All configuration is managed through `pim setup` and stored in `~/.pim/config.js
   "cache_ttl_hours": 24,
   "scope_pattern": "^.(?P<env>[PQTD]).{5}(?P<app>.{4})",
   "env_labels": { "P": "Prod", "D": "Dev", "Q": "QA", "T": "Test" },
+  "durations": [
+    { "label": "30 minutes", "iso8601": "PT30M", "minutes": 30 },
+    { "label": "1 hour", "iso8601": "PT1H", "minutes": 60 },
+  ],
 }
 ```
 
-| Field                   | Description                                                 |
-| ----------------------- | ----------------------------------------------------------- |
-| `subscriptions`         | Azure subscriptions to scan for eligible roles              |
-| `principal_id`          | Your Azure AD object ID                                     |
-| `quick_select_patterns` | Scope substrings for the `g` group-select key               |
-| `cache_ttl_hours`       | How long to cache eligible roles (default: 24)              |
-| `scope_pattern`         | Regexp with `env` and `app` named groups to decode RG names |
-| `env_labels`            | Map single-character environment codes to display labels    |
+- `subscriptions` — Azure subscriptions to scan for eligible roles
+- `principal_id` — your Azure AD object ID
+- `quick_select_patterns` — scope substrings for the `g` group-select key
+- `cache_ttl_hours` — how long to cache eligible roles (default: 24)
+- `scope_pattern` — regexp with `env` and `app` named groups to decode RG names
+- `env_labels` — map single-character environment codes to display labels
+- `durations` — optional activation duration options shown in Step 3
 
 ## Data Storage
 
 All local data lives in `~/.pim/`:
 
-| File                  | Purpose                                                 |
-| --------------------- | ------------------------------------------------------- |
-| `config.json`         | User configuration (subscriptions, principal ID, etc.)  |
-| `eligible-roles.json` | Cached eligible role assignments                        |
-| `cache-meta`          | Cache timestamp                                         |
-| `activations.json`    | Local record of activations (for justification display) |
+- `config.json` — user configuration (subscriptions, principal ID, etc.)
+- `eligible-roles-data.json` — cached eligible role assignments
+- `eligible-roles-meta.json` — cache metadata (`written_at` timestamp)
+- `active-roles-data.json` — cached active roles used by status mode
+- `active-roles-meta.json` — active-role cache metadata (`written_at` timestamp)
+- `activations.json` — local record of activations (for justification display)
 
 ## Documentation
 
-| Document                                     | Description                                                   |
-| -------------------------------------------- | ------------------------------------------------------------- |
-| [Architecture](docs/architecture.md)         | System design, control flow, component inventory              |
-| [Azure API Reference](docs/azure-api.md)     | REST endpoints, request/response shapes, OData filters        |
-| [Data Formats](docs/data-formats.md)         | Cache file schemas, RG naming convention, activation payloads |
-| [User Guide](docs/user-guide.md)             | Commands, key bindings, troubleshooting                       |
-| [Implementation Notes](docs/go-migration.md) | Architecture decisions, dependency choices, type mappings     |
+- [Architecture](docs/architecture.md) — system design, control flow, component inventory
+- [Data Formats](docs/data-formats.md) — cache file schemas, RG naming convention, activation payloads
+- [Active Roles Cache](docs/active-roles-cache.md) — status cache design and refresh behavior
+- [User Guide](docs/user-guide.md) — commands, key bindings, troubleshooting
+- [Implementation Notes](docs/go-migration.md) — architecture decisions, dependency choices, type mappings
 
 ## Troubleshooting
 
@@ -203,7 +206,7 @@ go build -o pim ./cmd/pim
 ./pim
 ```
 
-`go run` compiles and executes in one step — no install required. You need Go 1.22+ and an active `az login` session.
+`go run` compiles and executes in one step — no install required. You need Go 1.25+ and an active `az login` session.
 
 ## Contributing
 

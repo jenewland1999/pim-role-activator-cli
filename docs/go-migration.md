@@ -3,6 +3,10 @@
 > Architecture decisions, dependency choices, type definitions, and
 > component-by-component implementation details for the Go CLI.
 
+> Note: This document is a migration-time design record and may include
+> historical implementation details that differ from the current code.
+> For current behavior, prefer README.md and docs/user-guide.md.
+
 ## Why Go?
 
 | Concern             | Bash                        | Go                      |
