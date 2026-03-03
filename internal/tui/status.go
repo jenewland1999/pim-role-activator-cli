@@ -23,6 +23,15 @@ func PrintBanner(dryRun bool) {
 // PrintStatus renders the active-roles table to stdout.
 // showAppEnv should be true when a scope_pattern is configured in UserConfig.
 func PrintStatus(roles []model.ActiveRole, showAppEnv bool) {
+	printStatusTable(roles, showAppEnv, false)
+}
+
+// PrintCachedStatus renders the active-roles table with a "(cached)" indicator.
+func PrintCachedStatus(roles []model.ActiveRole, showAppEnv bool) {
+	printStatusTable(roles, showAppEnv, true)
+}
+
+func printStatusTable(roles []model.ActiveRole, showAppEnv bool, cached bool) {
 	if len(roles) == 0 {
 		fmt.Println()
 		fmt.Println("  " + Dim("No PIM roles are currently active."))
@@ -31,8 +40,13 @@ func PrintStatus(roles []model.ActiveRole, showAppEnv bool) {
 		return
 	}
 
+	suffix := ""
+	if cached {
+		suffix = " " + Dim("(cached)")
+	}
+
 	fmt.Println()
-	fmt.Printf("  %s %d active PIM role(s):\n", Check, len(roles))
+	fmt.Printf("  %s %d active PIM role(s):%s\n", Check, len(roles), suffix)
 	fmt.Println()
 
 	if showAppEnv {
