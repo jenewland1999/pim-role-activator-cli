@@ -10,8 +10,6 @@ import (
 )
 
 const (
-	// APIVersion is the ARM API version for all PIM endpoints.
-	APIVersion = "2020-10-01"
 	configFile = "config.json"
 )
 
