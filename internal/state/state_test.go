@@ -1,9 +1,11 @@
 package state
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,10 +20,13 @@ func pastEpoch() int64 {
 	return time.Now().Add(-1 * time.Hour).Unix()
 }
 
-func newStore(t *testing.T) *Store {
+func newStore(t *testing.T) (*Store, *bytes.Buffer) {
 	t.Helper()
 	dir := t.TempDir()
-	return New(filepath.Join(dir, "activations.json"))
+	var buf bytes.Buffer
+	s := New(filepath.Join(dir, "activations.json"))
+	s.Stderr = &buf
+	return s, &buf
 }
 
 func TestNew(t *testing.T) {
@@ -32,7 +37,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestLoad_MissingFile(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	records, err := s.Load()
 	if err != nil {
 		t.Fatalf("Load() error: %v", err)
@@ -43,7 +48,7 @@ func TestLoad_MissingFile(t *testing.T) {
 }
 
 func TestLoad_EmptyArray(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	if err := os.WriteFile(s.Path, []byte(`[]`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +62,7 @@ func TestLoad_EmptyArray(t *testing.T) {
 }
 
 func TestLoad_CorruptJSON(t *testing.T) {
-	s := newStore(t)
+	s, buf := newStore(t)
 	if err := os.WriteFile(s.Path, []byte(`{not json!!!`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -68,10 +73,18 @@ func TestLoad_CorruptJSON(t *testing.T) {
 	if records != nil {
 		t.Errorf("Load() = %v, want nil for corrupt JSON", records)
 	}
+	// Verify that a warning was emitted to stderr.
+	warning := buf.String()
+	if !strings.Contains(warning, "invalid JSON") {
+		t.Errorf("expected warning about invalid JSON on stderr, got %q", warning)
+	}
+	if !strings.Contains(warning, "activation history has been reset") {
+		t.Errorf("expected warning about history reset on stderr, got %q", warning)
+	}
 }
 
 func TestLoad_PrunesExpiredRecords(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	records := []model.ActivationRecord{
 		{
 			Scope:            "/subscriptions/sub-1",
@@ -102,7 +115,7 @@ func TestLoad_PrunesExpiredRecords(t *testing.T) {
 }
 
 func TestLoad_AllExpired(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	records := []model.ActivationRecord{
 		{Scope: "s1", RoleDefinitionID: "r1", ExpiresEpoch: pastEpoch()},
 		{Scope: "s2", RoleDefinitionID: "r2", ExpiresEpoch: pastEpoch()},
@@ -118,7 +131,7 @@ func TestLoad_AllExpired(t *testing.T) {
 }
 
 func TestLoad_PreservesAllFields(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	exp := futureEpoch()
 	records := []model.ActivationRecord{
 		{
@@ -168,7 +181,7 @@ func TestLoad_PreservesAllFields(t *testing.T) {
 }
 
 func TestSave_RoundTrip(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	exp := futureEpoch()
 	records := []model.ActivationRecord{
 		{
@@ -195,7 +208,7 @@ func TestSave_RoundTrip(t *testing.T) {
 }
 
 func TestSave_EmptySlice(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	if err := s.Save([]model.ActivationRecord{}); err != nil {
 		t.Fatalf("Save() error: %v", err)
 	}
@@ -213,7 +226,7 @@ func TestSave_EmptySlice(t *testing.T) {
 }
 
 func TestSave_FilePermissions(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	if err := s.Save([]model.ActivationRecord{}); err != nil {
 		t.Fatalf("Save() error: %v", err)
 	}
@@ -228,7 +241,7 @@ func TestSave_FilePermissions(t *testing.T) {
 }
 
 func TestSave_OverwritesExisting(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	exp := futureEpoch()
 	first := []model.ActivationRecord{
 		{Scope: "s1", RoleDefinitionID: "r1", Justification: "first", ExpiresEpoch: exp},
@@ -263,7 +276,7 @@ func TestSave_NonExistentDir(t *testing.T) {
 }
 
 func TestAppend_ToEmpty(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	exp := futureEpoch()
 	records := []model.ActivationRecord{
 		{Scope: "s1", RoleDefinitionID: "r1", Justification: "new", ExpiresEpoch: exp},
@@ -284,7 +297,7 @@ func TestAppend_ToEmpty(t *testing.T) {
 }
 
 func TestAppend_MergesWithExisting(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	exp := futureEpoch()
 	existing := []model.ActivationRecord{
 		{Scope: "s1", RoleDefinitionID: "r1", Justification: "existing", ExpiresEpoch: exp},
@@ -308,7 +321,7 @@ func TestAppend_MergesWithExisting(t *testing.T) {
 }
 
 func TestAppend_PrunesExpiredDuringMerge(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	exp := futureEpoch()
 	expired := []model.ActivationRecord{
 		{Scope: "s1", RoleDefinitionID: "r1", Justification: "expired", ExpiresEpoch: pastEpoch()},
@@ -333,7 +346,7 @@ func TestAppend_PrunesExpiredDuringMerge(t *testing.T) {
 }
 
 func TestLookupJustification_WithRecords(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	exp := futureEpoch()
 	records := []model.ActivationRecord{
 		{Scope: "/sub/1", RoleDefinitionID: "role-a", Justification: "reason one", ExpiresEpoch: exp},
@@ -357,7 +370,7 @@ func TestLookupJustification_WithRecords(t *testing.T) {
 }
 
 func TestLookupJustification_EmptyFile(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	m := s.LookupJustification()
 	if m == nil {
 		t.Fatal("LookupJustification() = nil, want non-nil empty map")
@@ -368,7 +381,7 @@ func TestLookupJustification_EmptyFile(t *testing.T) {
 }
 
 func TestLookupJustification_ExcludesExpired(t *testing.T) {
-	s := newStore(t)
+	s, _ := newStore(t)
 	exp := futureEpoch()
 	records := []model.ActivationRecord{
 		{Scope: "/sub/1", RoleDefinitionID: "role-a", Justification: "active", ExpiresEpoch: exp},

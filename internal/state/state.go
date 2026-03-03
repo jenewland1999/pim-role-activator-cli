@@ -4,6 +4,7 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -12,12 +13,14 @@ import (
 
 // Store manages loading, pruning, and saving activation records.
 type Store struct {
-	Path string // e.g. ~/.pim/activations.json
+	Path   string // e.g. ~/.pim/activations.json
+	Stderr io.Writer // destination for warning messages; defaults to os.Stderr
 }
 
-// New creates a Store for the given file path.
+// New creates a Store for the given file path. Warning messages are written to
+// os.Stderr by default; override Stderr for testing or to suppress output.
 func New(path string) *Store {
-	return &Store{Path: path}
+	return &Store{Path: path, Stderr: os.Stderr}
 }
 
 // Load reads all non-expired activation records from disk.
@@ -33,7 +36,9 @@ func (s *Store) Load() ([]model.ActivationRecord, error) {
 
 	var records []model.ActivationRecord
 	if err := json.Unmarshal(data, &records); err != nil {
-		// Corrupt state file — start fresh rather than aborting.
+		// Corrupt state file — start fresh rather than aborting, but warn
+		// the user so they know their activation history was reset.
+		fmt.Fprintf(s.Stderr, "warning: %s contains invalid JSON; activation history has been reset\n", s.Path)
 		return nil, nil
 	}
 
