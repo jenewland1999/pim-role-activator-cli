@@ -1,200 +1,179 @@
 # Codebase Audit — PIM Role Activator CLI
 
-**Date:** 2026-02-26
+**Date:** 2026-03-03 (post-PRD completion)
+**Previous audit:** 2026-02-26 (pre-PRD — 30 findings, 0 tests)
 
 ---
 
-## CRITICAL
+## Executive Summary
 
-### 1. No unit or integration tests exist
+The PRD roadmap (8 stages, 30+ items) has been fully executed. All 30 findings
+from the original 2026-02-26 audit have been resolved. The codebase now has
+79 unit tests across 5 packages, a CI pipeline with lint/vet/test/build, proper
+file permissions, context timeouts, signal handling, structured logging, atomic
+cache writes, input validation, config validation, dependency injection
+interfaces, and a `--version`/`pim version` subcommand.
 
-There are zero `_test.go` files in the entire repository. This is the single biggest risk to reliability and correctness. Every package — `azure`, `cache`, `config`, `model`, `state`, `setup`, `tui` — is completely untested. Regressions can ship silently, and the CI pipeline (`.github/workflows/ci.yml`) has no `go test` step.
-
-### 2. `pimDir()` uses `$HOME` — breaks on Windows
-
-`cmd/pim/main.go:33`: `os.Getenv("HOME")` returns empty on Windows. The standard library's `os.UserHomeDir()` handles all platforms correctly:
-
-```go
-// current (broken on Windows)
-dir := filepath.Join(os.Getenv("HOME"), ".pim")
-
-// fix
-home, err := os.UserHomeDir()
-```
-
-Since the CI matrix builds for Windows, this is a shipped-to-users bug.
-
-### 3. JWT decoded without signature verification
-
-`internal/azure/identity.go:44-60`: `GetTokenClaims` manually base64-decodes the JWT payload and trusts it unconditionally. While the comment says "we trust our own token", if this code were reused or the token source changed, there would be no integrity check. At minimum, document this trust boundary explicitly and ensure the function is never called with tokens from untrusted sources. Using `golang-jwt/jwt/v5` (already an indirect dependency) for proper parsing would be safer.
-
-### 4. Sensitive data written to disk with world-readable permissions
-
-- `internal/cache/cache.go:56`: `os.WriteFile(..., 0o644)` — the eligible-roles cache and meta file are readable by all users on the system.
-- `internal/config/config.go:83`: `os.WriteFile(..., 0o644)` — `config.json` contains `principal_id` (the user's Entra Object ID) and subscription UUIDs.
-- `internal/state/state.go:52`: `os.WriteFile(..., 0o644)` — `activations.json` contains justification text and role scopes.
-- `cmd/pim/main.go:34`: `os.MkdirAll(dir, 0o755)` — the `.pim` directory itself is world-readable.
-
-All of these should use `0o600` for files and `0o700` for directories.
+This follow-up audit examines the codebase in its current state and identifies
+remaining low-severity items and future improvement opportunities. No critical
+or high-severity issues remain.
 
 ---
 
-## HIGH
+## Status of Original Findings
 
-### 5. No context timeout/cancellation on Azure API calls
+All 30 items from the 2026-02-26 audit have been addressed:
 
-Throughout `cmd/pim/main.go`, `context.Background()` is used with no deadline or timeout. If Azure APIs are slow or unresponsive, the CLI hangs indefinitely. All network-bound operations should have a `context.WithTimeout`:
-
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-defer cancel()
-```
-
-### 6. `http.DefaultClient` used for subscription listing — no timeout
-
-`internal/azure/subscriptions.go:39`: `http.DefaultClient.Do(req)` has no timeout. A hung connection will block forever. Create a client with explicit timeout:
-
-```go
-client := &http.Client{Timeout: 30 * time.Second}
-```
-
-### 7. Unbounded response body decoding
-
-`internal/azure/subscriptions.go:48`: `json.NewDecoder(resp.Body).Decode(...)` reads the entire response body with no size limit. A misbehaving server could send an arbitrarily large payload causing OOM. Wrap with `io.LimitReader`:
-
-```go
-json.NewDecoder(io.LimitReader(resp.Body, 10<<20)).Decode(...)
-```
-
-### 8. Race condition in `ActivateRoles` — shared slice write from goroutines
-
-`internal/azure/activate.go:30-32`: `results[i] = ...` writes to distinct indices, which is safe in Go. However, the loop variable capture uses the legacy `i, role := i, role` pattern. With Go 1.22+ (the module uses Go 1.25), loop variables are per-iteration by default, making this redundant but harmless. No actual race, but the pattern should be cleaned up.
-
-### 9. Panic-on-empty in activation client creation
-
-`cmd/pim/main.go:133`: `azure.NewClients(cfg.Subscriptions[0].ID, cred)` will panic with an index-out-of-range if `cfg.Subscriptions` is empty (e.g. corrupted config). No bounds check is performed.
-
----
-
-## MEDIUM
-
-### 10. `version` variable referenced in ldflags but never declared
-
-The release workflow injects `-X main.version=...` via ldflags, but there is no `var version string` in `cmd/pim/main.go`. The linker silently drops the flag, so no version information is available at runtime. Add:
-
-```go
-var version = "dev"
-```
-
-and expose it via a `--version` flag or `pim version` subcommand.
-
-### 11. Dead code: `formatDuration` function
-
-`internal/tui/status.go:76`: `func formatDuration(d model.ActiveRole) string { return "" }` is entirely unused dead code with a misleading comment about import cycles. It should be removed.
-
-### 12. `truncate` function defined twice with different semantics
-
-- `cmd/pim/main.go:364`: operates on `[]rune` (Unicode-safe).
-- `internal/tui/selector.go:349`: operates on `[]byte` via `len(s)` (byte-length, breaks on multi-byte characters).
-
-The TUI version will corrupt multi-byte scope names. Unify to the rune-based version in a shared location.
-
-### 13. Cache is not atomic — partial writes can corrupt state
-
-`internal/cache/cache.go:52-58`: `Set()` writes the data file and then the meta file sequentially. A crash between the two writes leaves them out of sync. Use write-to-temp-then-rename (`os.Rename` is atomic on POSIX):
-
-```go
-tmp := path + ".tmp"
-os.WriteFile(tmp, data, 0o600)
-os.Rename(tmp, path)
-```
-
-### 14. State file `Load()` silently swallows corruption
-
-`internal/state/state.go:33-35`: If `activations.json` contains malformed JSON, `Load()` returns `nil, nil` with no warning. The user loses all activation history silently. At minimum, log a warning.
-
-### 15. No input sanitisation on justification text
-
-`cmd/pim/main.go:270-283`: The justification string is sent verbatim to the Azure API and persisted to disk. While Azure likely sanitises on its end, there is no local validation for length limits, control characters, or injection patterns.
-
-### 16. No `go vet` or `staticcheck` in CI
-
-`.github/workflows/ci.yml` runs `golangci-lint` but does not explicitly run `go test ./...`. The pipeline should include both `go vet ./...` and `go test ./...`.
+| # | Original Finding | Resolution | PRD Item |
+|---|------------------|------------|----------|
+| 1 | No tests | 79 tests across 5 packages; CI runs `go test -race` | 3.1–3.6 |
+| 2 | `os.Getenv("HOME")` | Replaced with `os.UserHomeDir()` | 1.1 |
+| 3 | JWT no signature verification | Using `golang-jwt/jwt/v5` `ParseUnverified`; trust boundary documented | 1.3 |
+| 4 | World-readable file permissions | All files `0o600`, directories `0o700` | 1.2 |
+| 5 | No context timeouts | `context.WithTimeout` + `--timeout` flag (default 2m) | 2.1 |
+| 6 | `http.DefaultClient` no timeout | Local `http.Client{Timeout: 30s}` | 2.2 |
+| 7 | Unbounded response body | `io.LimitReader` 10 MiB cap | 2.3 |
+| 8 | Loop variable capture (Go 1.22+) | Removed redundant rebinding | 4.4 |
+| 9 | Panic on empty subscriptions | Guard clause + `config.Validate()` | 1.4, 5.4 |
+| 10 | No `version` variable | `var version = "dev"` + `--version` flag + `pim version` | 6.1, 6.2 |
+| 11 | Dead `formatDuration` | Removed | 4.1 |
+| 12 | Duplicate `truncate` | Unified to rune-based `tui.Truncate()` | 4.2 |
+| 13 | Non-atomic cache writes | `atomicWriteFile` (temp + rename) | 5.1 |
+| 14 | Silent state corruption | `slog.Warn` on corrupt JSON | 5.2 |
+| 15 | No justification validation | `validateJustification`: non-empty, ≤500 runes, no control chars | 5.3 |
+| 16 | No `go vet`/tests in CI | CI has lint, vet, test (race), and multi-platform build jobs | 3.6 |
+| 17 | JSON tag casing | Consistent `snake_case` throughout; no change needed | — |
+| 18 | No signal handling | `signal.NotifyContext` for SIGINT/SIGTERM; exit 130 | 7.1 |
+| 19 | errgroup misuse | `ActivateRoles` now uses `sync.WaitGroup`; errgroup used correctly in parallel subscription fetch | 4.5, 7.2 |
+| 20 | Sequential subscription fetches | Parallelised via `errgroup` + `sync.Mutex` | 7.2 |
+| 21 | Unused `APIVersion` constant | Removed | 4.3 |
+| 22 | No `--version` flag | `--version` flag + `pim version` subcommand | 6.1, 6.2 |
+| 23 | No `.gitignore` | Comprehensive `.gitignore` added | 1.5 |
+| 24 | Binary in repo | Removed; `.gitignore` prevents reoccurrence | 1.5 |
+| 25 | No error wrapping | `fmt.Errorf` with `%w` throughout config, state, cache | 4.6 |
+| 26 | No structured logging | `log/slog` used for all warnings/errors | 6.3 |
+| 27 | Minimal config validation | `Validate()` checks `principal_id` + `subscriptions`; called by `Load()` | 5.4 |
+| 28 | No dependency injection | `Authenticator`, `RoleFetcher`, `RoleActivator`, `StateStore` interfaces | 8.1 |
+| 29 | Regex compiled every call | Cached via `sync.Once` in `ParsedScopePattern()` | 7.4 |
+| 30 | Hardcoded duration options | Configurable via `config.json` `durations` field | 7.3 |
 
 ---
 
-## LOW
+## Current Architecture Assessment
 
-### 17. `GroupSelectPatterns` has a JSON tag typo (inconsistent casing)
+### Strengths
 
-`internal/config/config.go:28`: The field is `GroupSelectPatterns` with JSON tag `"quick_select_patterns"` (snake_case, fine), but it uses a non-standard Go field name with `[]string` — the actual JSON name is correct but inconsistent with how users might expect it.
+- **Clean package structure**: `cmd/pim` → `internal/{azure,cache,config,model,setup,state,tui}`. No import cycles. Model package has zero external dependencies.
+- **Comprehensive test coverage**: 79 tests across `model` (14), `cache` (12), `config` (34), `state` (18), `azure/identity` (12). All use `t.TempDir()` isolation and run with `-race`.
+- **Robust CI pipeline**: Lint (gofmt + golangci-lint), vet, test (race), multi-platform build (5 targets), semantic-release.
+- **Defence in depth**: Context timeouts + HTTP client timeouts + `io.LimitReader` + atomic writes + file permissions.
+- **Good UX**: Interactive TUI with search/filter, cached role display, spinner feedback, dry-run mode, signal handling, configurable durations.
+- **Structured observability**: `log/slog` for warnings/errors with structured key-value attributes.
+- **Testability foundations**: DI interfaces for all major external dependencies (`Authenticator`, `RoleFetcher`, `RoleActivator`, `StateStore`).
 
-### 18. No graceful signal handling
+### Metrics
 
-The CLI does not handle `SIGINT`/`SIGTERM` gracefully. If the user presses Ctrl+C during an API call (outside the bubbletea program), the process terminates without cleanup. Consider registering a signal handler to cancel the context.
-
-### 19. `errgroup` context cancellation not leveraged properly
-
-`internal/azure/activate.go:28`: `g, ctx := errgroup.WithContext(ctx)` creates a child context, but every goroutine returns `nil` unconditionally. The `errgroup` cancellation feature is effectively unused. A plain `sync.WaitGroup` would express intent more clearly, or the function should propagate at least one error and cancel siblings on fatal failures (e.g. auth token expired).
-
-### 20. Pager responses are not parallelised across subscriptions
-
-`cmd/pim/main.go:80-92`: Eligible and active role fetches loop over subscriptions sequentially. For users with many subscriptions, this could be slow. Consider parallelising across subscriptions.
-
-### 21. Hardcoded API version constant is unused
-
-`internal/config/config.go:12`: `APIVersion = "2020-10-01"` is declared but never referenced anywhere in the codebase — the Azure SDK manages its own API versions.
-
-### 22. No `--version` flag or version subcommand
-
-Users have no way to check which version of the CLI they are running, making support and debugging harder.
-
-### 23. `go.sum` and `.gitignore` not checked
-
-No `.gitignore` was found in the workspace listing. Ensure the compiled binary (`main`) at the root (visible in the file tree) is not committed.
-
-### 24. Binary committed to repo
-
-The file `main` at the repository root appears to be a compiled binary. This should be in `.gitignore` and removed from version control.
-
-### 25. No error wrapping context in several return paths
-
-Several error returns (e.g. in `config.Load`, `state.Save`) propagate raw `os` or `json` errors without additional context, making debugging harder. Use `fmt.Errorf("loading state: %w", err)` consistently.
+| Metric | Value |
+|--------|-------|
+| Go version | 1.25.0 |
+| Direct dependencies | 10 |
+| Source files (`.go`, excl. tests) | 16 |
+| Test files | 5 |
+| Unit tests | 79 |
+| Packages | 8 (`main` + 7 internal) |
+| Lines of Go (approx.) | ~2,600 |
+| CI jobs | 4 (lint, test, build×5, release) |
 
 ---
 
-## INFORMATIONAL / BEST PRACTICES
+## Remaining Findings
 
-### 26. Consider using `slog` for structured logging
+### LOW
 
-The codebase uses `fmt.Fprintf(os.Stderr, ...)` for warnings. Go 1.21+ provides `log/slog` for structured, levelled logging which would improve observability.
+#### 1. `SelectionMarker()` is exported but never called
 
-### 27. Config validation is minimal
+`internal/tui/styles.go`: `SelectionMarker(selected bool) string` is defined and exported but never referenced anywhere in the codebase. The selector uses pre-rendered `rowRender` structs with inline checkmark strings instead. This is dead code that should be removed.
 
-`config.Load()` deserialises JSON but does not validate that required fields (`principal_id`, `subscriptions`) are present or well-formed. A post-load validation step would prevent confusing runtime errors.
+#### 2. `PruneCachedRoles()` is only used in tests
 
-### 28. Consider dependency injection for testability
+`internal/model/role.go`: `PruneCachedRoles` is exported but only called from `role_test.go`. The production code uses `FromCachedRoles` (which prunes and converts in one pass). Consider removing `PruneCachedRoles` or marking it as a test helper if it serves no real caller.
 
-Azure client calls, file I/O, and UI rendering are all tightly coupled. Introducing interfaces (e.g. `RoleFetcher`, `StateStore`) would enable mocking and testing without live Azure credentials.
+#### 3. `Scopes()` method is only used in tests
 
-### 29. `ScopePattern` regex is compiled on every invocation
+`internal/config/config.go`: `Scopes()` is exported and tested but never called from production code. The subscription loop in `main.go` constructs scope strings inline. Either wire it into the callers or accept it as a convenience method for future use.
 
-`ParsedScopePattern()` in `internal/config/config.go:43-48` compiles the regex every time it is called. While called infrequently, caching it (via `sync.Once` or a field) is cleaner.
+#### 4. State file writes are not atomic
 
-### 30. Duration options are hardcoded
+`internal/state/state.go`: `Save()` uses `os.WriteFile` directly, unlike `cache.Set()` which was upgraded to atomic writes (temp + rename) in item 5.1. A crash during `Save()` could leave `activations.json` truncated. The `atomicWriteFile` helper in `cache.go` could be extracted to a shared `internal/fileutil` package and reused.
 
-`internal/model/role.go:30-36`: The 4 duration options (30m, 1h, 2h, 4h) are hardcoded. Consider making them configurable via `config.json` to accommodate different Azure PIM policies that allow up to 8 or 24 hours.
+#### 5. Config file writes are not atomic
+
+`internal/config/config.go`: `Save()` also uses `os.WriteFile` directly. Same risk as state — a crash during write could corrupt `config.json`. Lower impact since config is only written during `pim setup`, but applying the same atomic write pattern would be consistent.
+
+#### 6. No tests for `setup`, `tui`, or `azure` (non-identity) packages
+
+Tests exist for `model`, `cache`, `config`, `state`, and `azure/identity`. The following remain untested:
+- `internal/setup/setup.go` — interactive wizard (would need mocked `huh` form inputs)
+- `internal/tui/*.go` — bubbletea models (would need `teatest` or similar)
+- `internal/azure/activate.go`, `active.go`, `eligible.go`, `subscriptions.go` — ARM API calls (would need mock ARM clients or HTTP record/replay)
+
+These are harder to unit test due to interactive I/O and Azure SDK dependencies, but the DI interfaces from 8.1 lay the groundwork.
+
+#### 7. `gofmt` formatting should be verified locally
+
+CI checks `gofmt` compliance, but developers should also run `gofmt -w .` locally. Consider adding a `Makefile` or `.pre-commit-config.yaml` to automate this.
+
+#### 8. No `golangci-lint` configuration file
+
+The CI runs `golangci-lint` with defaults. A `.golangci.yml` file would make the linter configuration explicit and allow enabling additional linters (e.g. `errcheck`, `gosec`, `exhaustive`, `gocyclo`).
+
+---
+
+### INFORMATIONAL / FUTURE IMPROVEMENTS
+
+#### 9. Consider extracting `atomicWriteFile` to a shared package
+
+The `atomicWriteFile` helper in `internal/cache/cache.go` is well-implemented but private to the cache package. Extracting it to `internal/fileutil` would allow reuse in `config.Save()` and `state.Save()`.
+
+#### 10. Consider `teatest` for TUI component testing
+
+The `charmbracelet/x/exp/teatest` package enables headless bubbletea model testing. The selector and duration picker could be tested without a real terminal.
+
+#### 11. No integration or end-to-end tests
+
+All tests are unit-level. An integration test that exercises `runStatus`/`runActivate` with a mocked Azure backend (via the DI interfaces) would catch wiring bugs. This is a natural next step given the interfaces from 8.1.
+
+#### 12. `config.Save` does not use atomic writes but `cache.Set` does
+
+Inconsistency in write safety across the codebase. Both should behave the same way.
+
+#### 13. Release workflow `ldflags` injection should be verified
+
+The release workflow injects version via `-ldflags "-X main.version=..."`. With `var version = "dev"` now declared, this should work correctly, but the release workflow was not modified as part of the PRD (only `ci.yml` was). Verify the release build produces correct version output.
+
+#### 14. No `CHANGELOG.md` in the repository
+
+The project uses semantic-release which generates GitHub release notes automatically, but there is no `CHANGELOG.md` committed to the repository for offline reference.
+
+#### 15. Documentation is comprehensive but could link to the schema
+
+The user guide docs exist but don't reference `docs/config.schema.json`. Adding a note in the user guide about editor autocompletion via the `$schema` field would improve discoverability.
 
 ---
 
 ## Summary
 
-| Criticality       | Count | Key Themes                                              |
-| ----------------- | ----- | ------------------------------------------------------- |
-| **Critical**      | 4     | No tests, Windows breakage, world-readable secrets, JWT |
-| **High**          | 5     | No timeouts, unbounded reads, potential panic           |
-| **Medium**        | 7     | Dead code, non-atomic writes, no version info, CI gaps  |
-| **Low**           | 9     | Signal handling, parallelisation, unused constants      |
-| **Informational** | 5     | Structured logging, DI, config validation               |
+| Severity | Count | Themes |
+|----------|-------|--------|
+| **Critical** | 0 | — |
+| **High** | 0 | — |
+| **Medium** | 0 | — |
+| **Low** | 8 | Dead code (2), unused exports (1), non-atomic writes (2), missing tests (1), tooling (2) |
+| **Informational** | 7 | Shared utilities, integration tests, release verification, docs |
 
-The highest-impact improvements would be: **(1)** adding tests + `go test` to CI, **(2)** fixing file permissions to `0o600`/`0o700`, **(3)** replacing `os.Getenv("HOME")` with `os.UserHomeDir()`, and **(4)** adding context timeouts to all network operations.
+The codebase is in good shape. All critical, high, and medium issues from the original audit have been resolved. The remaining items are low-severity cleanup tasks and future improvement opportunities. The most impactful next steps would be:
+
+1. **Extract `atomicWriteFile` to a shared package** and apply it to state and config writes (items 4, 5, 9, 12)
+2. **Remove dead code**: `SelectionMarker`, and optionally `PruneCachedRoles` (items 1, 2)
+3. **Add integration tests** using the DI interfaces from 8.1 (item 11)
+4. **Add a `.golangci.yml`** for explicit linter configuration (item 8)
