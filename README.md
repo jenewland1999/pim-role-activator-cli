@@ -182,6 +182,29 @@ All local data lives in `~/.pim/`:
 | Stale data after role changes | Run `pim activate --no-cache` to refresh                                       |
 | Wrong identity detected       | Run `pim setup` to update your principal ID                                    |
 
+## Development
+
+To run the CLI directly from source without installing a binary:
+
+```bash
+# Run the default command (status)
+go run ./cmd/pim
+
+# Run a specific subcommand
+go run ./cmd/pim activate
+go run ./cmd/pim setup
+go run ./cmd/pim activate --dry-run --no-cache
+
+# Run tests
+go test -race ./...
+
+# Build a local binary (outputs to current directory)
+go build -o pim ./cmd/pim
+./pim
+```
+
+`go run` compiles and executes in one step — no install required. You need Go 1.22+ and an active `az login` session.
+
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
