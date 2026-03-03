@@ -453,7 +453,8 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 
 // runSetup runs the interactive configuration wizard.
 func runSetup(cmd *cobra.Command, _ []string) error {
-	ctx := cmd.Context()
+	ctx, cancel := context.WithTimeout(cmd.Context(), apiTimeout)
+	defer cancel()
 	dir := pimDir()
 
 	var suggestedOID string

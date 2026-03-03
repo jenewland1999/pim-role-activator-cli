@@ -12,6 +12,21 @@ import (
 	"github.com/jenewland1999/pim-role-activator-cli/internal/model"
 )
 
+var (
+	newRequestID = func() string { return uuid.New().String() }
+	nowUTC       = func() time.Time { return time.Now().UTC() }
+	createRoleAssignmentScheduleRequest = func(
+		ctx context.Context,
+		client *armauthorization.RoleAssignmentScheduleRequestsClient,
+		scope string,
+		requestID string,
+		req armauthorization.RoleAssignmentScheduleRequest,
+	) error {
+		_, err := client.Create(ctx, scope, requestID, req, nil)
+		return err
+	}
+)
+
 // ActivateRoles sends parallel SelfActivate PUT requests for all selected roles.
 // Individual role failures are captured in ActivationResult.Err rather than
 // aborting the whole group — every role gets an attempt.
@@ -30,8 +45,8 @@ func ActivateRoles(
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			requestID := uuid.New().String()
-			startTime := time.Now().UTC()
+			requestID := newRequestID()
+			startTime := nowUTC()
 
 			req := armauthorization.RoleAssignmentScheduleRequest{
 				Properties: &armauthorization.RoleAssignmentScheduleRequestProperties{
@@ -49,7 +64,7 @@ func ActivateRoles(
 				},
 			}
 
-			_, err := client.Create(ctx, role.Scope, requestID, req, nil)
+			err := createRoleAssignmentScheduleRequest(ctx, client, role.Scope, requestID, req)
 			results[i] = model.ActivationResult{Role: role, Err: err}
 		}()
 	}
