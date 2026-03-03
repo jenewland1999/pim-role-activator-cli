@@ -16,12 +16,12 @@ type durationModel struct {
 	cancelled bool
 }
 
-func newDurationModel(defaultIdx int) durationModel {
-	if defaultIdx < 0 || defaultIdx >= len(model.DurationOptions) {
-		defaultIdx = 1 // fall back to 1 hour
+func newDurationModel(options []model.DurationOption, defaultIdx int) durationModel {
+	if defaultIdx < 0 || defaultIdx >= len(options) {
+		defaultIdx = 0
 	}
 	return durationModel{
-		options: model.DurationOptions,
+		options: options,
 		cursor:  defaultIdx,
 	}
 }
@@ -74,11 +74,10 @@ func (m durationModel) View() string {
 }
 
 // RunDurationSelector launches the arrow-key duration picker.
-// defaultIdx sets the initial cursor position; pass 1 for "1 hour".
-// Returns the chosen index into model.DurationOptions, a cancelled flag, and
-// any error.
-func RunDurationSelector(defaultIdx int) (int, bool, error) {
-	m := newDurationModel(defaultIdx)
+// options is the list of durations to present; defaultIdx sets the initial
+// cursor position. Returns the chosen index, a cancelled flag, and any error.
+func RunDurationSelector(options []model.DurationOption, defaultIdx int) (int, bool, error) {
+	m := newDurationModel(options, defaultIdx)
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithFPS(60))
 	finalModel, err := p.Run()
 	if err != nil {

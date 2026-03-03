@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jenewland1999/pim-role-activator-cli/internal/model"
 )
 
 // --- Load ---
@@ -464,6 +466,83 @@ func TestValidate_EmptySubscriptionsSlice(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no subscriptions configured") {
 		t.Errorf("error = %q, want mention of subscriptions", err)
+	}
+}
+
+// --- DurationOptions ---
+
+func TestDurationOptions_DefaultWhenEmpty(t *testing.T) {
+	cfg := &UserConfig{PrincipalID: "x", Subscriptions: []Subscription{{ID: "s", Name: "n"}}}
+	got := cfg.DurationOptions()
+	if len(got) != len(model.DurationOptions) {
+		t.Fatalf("len = %d, want %d (built-in defaults)", len(got), len(model.DurationOptions))
+	}
+	for i, opt := range got {
+		if opt != model.DurationOptions[i] {
+			t.Errorf("[%d] = %+v, want %+v", i, opt, model.DurationOptions[i])
+		}
+	}
+}
+
+func TestDurationOptions_CustomOverride(t *testing.T) {
+	cfg := &UserConfig{
+		PrincipalID:   "x",
+		Subscriptions: []Subscription{{ID: "s", Name: "n"}},
+		Durations: []DurationConfig{
+			{Label: "15 minutes", ISO8601: "PT15M", Minutes: 15},
+			{Label: "8 hours", ISO8601: "PT8H", Minutes: 480},
+		},
+	}
+	got := cfg.DurationOptions()
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+	if got[0].Label != "15 minutes" || got[0].ISO8601 != "PT15M" || got[0].Duration != 15*time.Minute {
+		t.Errorf("[0] = %+v", got[0])
+	}
+	if got[1].Label != "8 hours" || got[1].ISO8601 != "PT8H" || got[1].Duration != 480*time.Minute {
+		t.Errorf("[1] = %+v", got[1])
+	}
+}
+
+func TestDurationOptions_RoundTripThroughJSON(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &UserConfig{
+		PrincipalID:   "abc",
+		Subscriptions: []Subscription{{ID: "sub-1", Name: "Dev"}},
+		Durations: []DurationConfig{
+			{Label: "1 hour", ISO8601: "PT1H", Minutes: 60},
+			{Label: "24 hours", ISO8601: "PT24H", Minutes: 1440},
+		},
+	}
+	if err := Save(dir, cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	loaded, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	opts := loaded.DurationOptions()
+	if len(opts) != 2 {
+		t.Fatalf("len = %d, want 2", len(opts))
+	}
+	if opts[0].Label != "1 hour" || opts[0].Duration != time.Hour {
+		t.Errorf("[0] = %+v", opts[0])
+	}
+	if opts[1].Label != "24 hours" || opts[1].Duration != 24*time.Hour {
+		t.Errorf("[1] = %+v", opts[1])
+	}
+}
+
+func TestDurationOptions_NilDurationsFieldUsesDefaults(t *testing.T) {
+	cfg := &UserConfig{
+		PrincipalID:   "x",
+		Subscriptions: []Subscription{{ID: "s", Name: "n"}},
+		Durations:     nil,
+	}
+	got := cfg.DurationOptions()
+	if len(got) != len(model.DurationOptions) {
+		t.Fatalf("len = %d, want defaults (%d)", len(got), len(model.DurationOptions))
 	}
 }
 

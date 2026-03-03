@@ -375,7 +375,13 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 	}
 
 	// ── Step 3: Duration (arrow-key picker, defaults to 1 hour) ──────────────
-	durationIdx, cancelled, err := tui.RunDurationSelector(1)
+	durationOpts := cfg.DurationOptions()
+	// Default to index 1 ("1 hour") when using 4+ built-in options, else 0.
+	defaultDurIdx := 0
+	if len(durationOpts) > 1 {
+		defaultDurIdx = 1
+	}
+	durationIdx, cancelled, err := tui.RunDurationSelector(durationOpts, defaultDurIdx)
 	if err != nil {
 		return fmt.Errorf("duration selector error: %w", err)
 	}
@@ -384,7 +390,7 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	duration := model.DurationOptions[durationIdx]
+	duration := durationOpts[durationIdx]
 
 	// ── Summary ───────────────────────────────────────────────────────────────
 	tui.PrintSummary(selectedRoles, justification, duration.Label, dryRun, showAppEnv)

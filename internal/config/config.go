@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"github.com/jenewland1999/pim-role-activator-cli/internal/model"
 )
 
 const (
@@ -19,6 +21,14 @@ const (
 type Subscription struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// DurationConfig represents a user-configured activation duration option.
+// All three fields are required when present.
+type DurationConfig struct {
+	Label   string `json:"label"`   // e.g. "8 hours"
+	ISO8601 string `json:"iso8601"` // e.g. "PT8H" (sent to Azure API)
+	Minutes int    `json:"minutes"` // e.g. 480 (used to compute expiry locally)
 }
 
 // UserConfig is the persistent user configuration stored in ~/.pim/config.json.
@@ -36,6 +46,9 @@ type UserConfig struct {
 	// For example: {"P": "Prod", "D": "Dev", "Q": "QA"}.
 	// When empty, the raw decoded value from the regexp capture group is used.
 	EnvLabels map[string]string `json:"env_labels,omitempty"`
+	// Durations overrides the default activation duration options (30m/1h/2h/4h).
+	// When empty or omitted, the built-in defaults are used.
+	Durations []DurationConfig `json:"durations,omitempty"`
 }
 
 // ParsedScopePattern compiles and returns the configured ScopePattern regexp,
@@ -54,6 +67,25 @@ func (c *UserConfig) CacheTTL() time.Duration {
 		h = 24
 	}
 	return time.Duration(h) * time.Hour
+}
+
+// DurationOptions returns the list of activation duration choices to present in
+// the TUI. When the user has configured custom durations in config.json, those
+// are returned; otherwise the built-in defaults from model.DurationOptions are
+// used.
+func (c *UserConfig) DurationOptions() []model.DurationOption {
+	if len(c.Durations) == 0 {
+		return model.DurationOptions
+	}
+	opts := make([]model.DurationOption, len(c.Durations))
+	for i, d := range c.Durations {
+		opts[i] = model.DurationOption{
+			Label:    d.Label,
+			ISO8601:  d.ISO8601,
+			Duration: time.Duration(d.Minutes) * time.Minute,
+		}
+	}
+	return opts
 }
 
 // Scopes returns an ARM subscription scope string for each configured subscription.
