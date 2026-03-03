@@ -3,6 +3,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -65,13 +66,14 @@ func (c *UserConfig) Scopes() []string {
 
 // Load reads and deserialises the config file from dir.
 func Load(dir string) (*UserConfig, error) {
-	data, err := os.ReadFile(filepath.Join(dir, configFile))
+	p := filepath.Join(dir, configFile)
+	data, err := os.ReadFile(p)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("config: read %s: %w", p, err)
 	}
 	var cfg UserConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("config: parse %s: %w", p, err)
 	}
 	return &cfg, nil
 }
@@ -79,13 +81,17 @@ func Load(dir string) (*UserConfig, error) {
 // Save serialises cfg to disk inside dir, creating the directory if needed.
 func Save(dir string, cfg *UserConfig) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
+		return fmt.Errorf("config: create directory %s: %w", dir, err)
 	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("config: marshal: %w", err)
 	}
-	return os.WriteFile(filepath.Join(dir, configFile), data, 0o600)
+	p := filepath.Join(dir, configFile)
+	if err := os.WriteFile(p, data, 0o600); err != nil {
+		return fmt.Errorf("config: write %s: %w", p, err)
+	}
+	return nil
 }
 
 // Exists reports whether a config file is present in dir.

@@ -3,6 +3,7 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -27,7 +28,7 @@ func (s *Store) Load() ([]model.ActivationRecord, error) {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("state: read %s: %w", s.Path, err)
 	}
 
 	var records []model.ActivationRecord
@@ -51,16 +52,19 @@ func (s *Store) Load() ([]model.ActivationRecord, error) {
 func (s *Store) Save(records []model.ActivationRecord) error {
 	data, err := json.MarshalIndent(records, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("state: marshal activations: %w", err)
 	}
-	return os.WriteFile(s.Path, data, 0o600)
+	if err := os.WriteFile(s.Path, data, 0o600); err != nil {
+		return fmt.Errorf("state: write %s: %w", s.Path, err)
+	}
+	return nil
 }
 
 // Append loads existing records, merges new ones, prunes expired entries and saves.
 func (s *Store) Append(newRecords []model.ActivationRecord) error {
 	existing, err := s.Load()
 	if err != nil {
-		return err
+		return fmt.Errorf("state: append: %w", err)
 	}
 	all := append(existing, newRecords...)
 	return s.Save(all)
