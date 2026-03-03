@@ -152,8 +152,8 @@ A summary is shown before any API calls are made:
 ```text
 ─── Summary ────────────────────────────────────────────────────────────
   Roles:
-    ▸ APP1  Prod  RG-PRD-APP1-001           Contributor
-    ▸ APP2  Prod  RG-PRD-APP2-001           Contributor
+    ▸ APP1  Prod  RG-PRD-APP1-001    Contributor              Shared Services
+    ▸ APP2  Prod  RG-PRD-APP2-001    Contributor              Pet Platform
   Justification: Deploying hotfix for critical bug
   Duration:      1 hour
 ────────────────────────────────────────────────────────────────────────

@@ -376,27 +376,27 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 	fmt.Println()
 	fmt.Printf("  %s Selected %d role(s):\n", tui.Check, len(selectedRoles))
 	if showAppEnv {
-		fmt.Printf("  %s\n", tui.Dim(fmt.Sprintf("    %-4s  %-4s  %-18s  %-30s  %-32s", "App", "Env", "Scope", "Role", "Subscription")))
-		fmt.Println("  " + tui.Dim(strings.Repeat("─", 100)))
+		fmt.Printf("  %s\n", tui.Dim(fmt.Sprintf("    %-4s  %-4s  %-18s  %-24s  %-24s", "App", "Env", "Scope", "Role", "Subscription")))
+		fmt.Println("  " + tui.Dim(strings.Repeat("─", 88)))
 		for _, r := range selectedRoles {
-			fmt.Printf("  %s %-4s  %-4s  %-18s  %-30s  %-32s\n",
+			fmt.Printf("  %s %-4s  %-4s  %-18s  %-24s  %-24s\n",
 				tui.Arrow,
-				r.AppCode,
-				r.Environment,
+				tui.Truncate(strings.TrimSpace(r.AppCode), 4),
+				tui.Truncate(strings.TrimSpace(r.Environment), 4),
 				tui.Truncate(r.ScopeName, 18),
-				tui.Truncate(r.RoleName, 30),
-				tui.Truncate(r.SubscriptionName, 32),
+				tui.Truncate(r.RoleName, 24),
+				tui.Truncate(r.SubscriptionName, 24),
 			)
 		}
 	} else {
-		fmt.Printf("  %s\n", tui.Dim(fmt.Sprintf("    %-18s  %-30s  %-32s", "Scope", "Role", "Subscription")))
-		fmt.Println("  " + tui.Dim(strings.Repeat("─", 88)))
+		fmt.Printf("  %s\n", tui.Dim(fmt.Sprintf("    %-18s  %-24s  %-24s", "Scope", "Role", "Subscription")))
+		fmt.Println("  " + tui.Dim(strings.Repeat("─", 74)))
 		for _, r := range selectedRoles {
-			fmt.Printf("  %s %-18s  %-30s  %-32s\n",
+			fmt.Printf("  %s %-18s  %-24s  %-24s\n",
 				tui.Arrow,
 				tui.Truncate(r.ScopeName, 18),
-				tui.Truncate(r.RoleName, 30),
-				tui.Truncate(r.SubscriptionName, 32),
+				tui.Truncate(r.RoleName, 24),
+				tui.Truncate(r.SubscriptionName, 24),
 			)
 		}
 	}

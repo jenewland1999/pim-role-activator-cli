@@ -107,11 +107,21 @@ func PrintSummary(roles []model.Role, justification, durationLabel string, dryRu
 	fmt.Println("  " + Bold("Roles:"))
 	for _, r := range roles {
 		if showAppEnv {
-			fmt.Printf("    %s %-4s  %-4s  %-18s  %-30s  %-32s\n",
-				Arrow, r.AppCode, r.Environment, r.ScopeName, r.RoleName, Truncate(r.SubscriptionName, 32))
+			fmt.Printf("    %s %-4s  %-4s  %-18s  %-24s  %-24s\n",
+				Arrow,
+				Truncate(displayOrDash(r.AppCode), 4),
+				Truncate(displayOrDash(r.Environment), 4),
+				Truncate(r.ScopeName, 18),
+				Truncate(r.RoleName, 24),
+				Truncate(r.SubscriptionName, 24),
+			)
 		} else {
-			fmt.Printf("    %s %-18s  %-30s  %-32s\n",
-				Arrow, r.ScopeName, r.RoleName, Truncate(r.SubscriptionName, 32))
+			fmt.Printf("    %s %-18s  %-24s  %-24s\n",
+				Arrow,
+				Truncate(r.ScopeName, 18),
+				Truncate(r.RoleName, 24),
+				Truncate(r.SubscriptionName, 24),
+			)
 		}
 	}
 	fmt.Println("  " + Bold("Justification: ") + justification)
