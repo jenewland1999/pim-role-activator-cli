@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/charmbracelet/huh"
@@ -30,6 +31,29 @@ var (
 )
 
 const defaultAPITimeout = 2 * time.Minute
+
+// maxJustificationLen is the maximum number of runes allowed in a justification
+// string. Azure PIM does not formally document a limit, but 500 characters is a
+// reasonable upper bound that covers any realistic audit justification.
+const maxJustificationLen = 500
+
+// validateJustification checks that the justification text is non-empty, within
+// the length limit, and free of control characters (tabs and newlines are not
+// expected in a single-line input and could corrupt audit logs).
+func validateJustification(s string) error {
+	if strings.TrimSpace(s) == "" {
+		return fmt.Errorf("justification cannot be empty")
+	}
+	if len([]rune(s)) > maxJustificationLen {
+		return fmt.Errorf("justification must be %d characters or fewer", maxJustificationLen)
+	}
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			return fmt.Errorf("justification must not contain control characters")
+		}
+	}
+	return nil
+}
 
 // pimDir returns ~/.pim/ and ensures the directory exists.
 func pimDir() string {
@@ -85,8 +109,20 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	storeFile := filepath.Join(dir, "activations.json")
 	justMap := state.New(storeFile).LookupJustification()
 
+	// ── Fast path: show cached active roles immediately ──────────────────────
+	cachedRoles, cacheHit := cache.LoadActiveRoles(dir, cfg.CacheTTL())
+	if cacheHit {
+		tui.PrintCachedStatus(cachedRoles, showAppEnv)
+	}
+
+	// ── Refresh from API ─────────────────────────────────────────────────────
+	spinnerMsg := "Checking active PIM roles…"
+	if cacheHit {
+		spinnerMsg = "Refreshing active roles…"
+	}
+
 	var allRoles []model.ActiveRole
-	if err := tui.RunWithSpinner("Checking active PIM roles…", func() error {
+	if err := tui.RunWithSpinner(spinnerMsg, func() error {
 		for _, sub := range cfg.Subscriptions {
 			clients, e := azure.NewClients(sub.ID, cred)
 			if e != nil {
@@ -100,10 +136,32 @@ func runStatus(_ *cobra.Command, _ []string) error {
 		}
 		return nil
 	}); err != nil {
+		if cacheHit {
+			// We already showed cached results — warn but don't fail hard.
+			fmt.Fprintf(os.Stderr, "  %s Could not refresh active roles: %v\n", tui.Cross, err)
+			return nil
+		}
 		return fmt.Errorf("%s Failed to fetch active role assignments: %w", tui.Cross, err)
 	}
 
-	tui.PrintStatus(allRoles, showAppEnv)
+	// Persist fresh results to cache.
+	if len(allRoles) > 0 {
+		if saveErr := cache.SaveActiveRoles(dir, cfg.CacheTTL(), allRoles); saveErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not cache active roles: %v\n", saveErr)
+		}
+	}
+
+	// If we showed cached data, only reprint if the fresh data differs.
+	if cacheHit {
+		if !model.ActiveRolesEqual(cachedRoles, allRoles) {
+			tui.PrintStatus(allRoles, showAppEnv)
+		} else {
+			fmt.Println("  " + tui.Dim("Up to date."))
+			fmt.Println()
+		}
+	} else {
+		tui.PrintStatus(allRoles, showAppEnv)
+	}
 	return nil
 }
 
@@ -153,7 +211,7 @@ func runActivate(_ *cobra.Command, _ []string) error {
 	}
 
 	// ── Step 0: Eligible roles with 24h cache ────────────────────────────────
-	roleCache := cache.New(dir, cfg.CacheTTL())
+	roleCache := cache.New(dir, cfg.CacheTTL(), "eligible-roles")
 	var eligibleRoles []model.Role
 
 	if !noCache {
@@ -275,12 +333,7 @@ func runActivate(_ *cobra.Command, _ []string) error {
 				Title("Step 2: Justification").
 				Description("Appears verbatim in Azure audit logs.").
 				Placeholder("e.g. Deploying hotfix to production").
-				Validate(func(s string) error {
-					if strings.TrimSpace(s) == "" {
-						return fmt.Errorf("justification cannot be empty")
-					}
-					return nil
-				}).
+				Validate(validateJustification).
 				Value(&justification),
 		),
 	)
