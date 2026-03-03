@@ -59,3 +59,13 @@ func SelectionMarker(selected bool) string {
 	}
 	return "  "
 }
+
+// Truncate shortens s to max runes, appending "…" when truncated.
+// It operates on runes so multi-byte characters are handled correctly.
+func Truncate(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max-1]) + "…"
+}

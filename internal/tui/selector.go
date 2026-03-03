@@ -32,15 +32,15 @@ func buildRowRender(r model.Role, showAppEnv bool) rowRender {
 		rest = fmt.Sprintf("%-4s  %-4s  %-18s  %-30s  %-32s",
 			r.AppCode,
 			r.Environment,
-			truncate(r.ScopeName, 18),
-			truncate(r.RoleName, 30),
-			truncate(r.SubscriptionName, 32),
+			Truncate(r.ScopeName, 18),
+			Truncate(r.RoleName, 30),
+			Truncate(r.SubscriptionName, 32),
 		)
 	} else {
 		rest = fmt.Sprintf("%-18s  %-30s  %-32s",
-			truncate(r.ScopeName, 18),
-			truncate(r.RoleName, 30),
-			truncate(r.SubscriptionName, 32),
+			Truncate(r.ScopeName, 18),
+			Truncate(r.RoleName, 30),
+			Truncate(r.SubscriptionName, 32),
 		)
 	}
 	lineUnsel := "    " + rest // 4 spaces for marker column
@@ -335,13 +335,7 @@ func (m selectorModel) View() string {
 	return sb.String()
 }
 
-// truncate shortens s to max characters, appending "…" if needed.
-func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max-1] + "…"
-}
+
 
 // RunSelector launches the interactive role selector and returns the chosen roles.
 // cancelled is true when the user pressed 'c' or Ctrl+C without confirming.

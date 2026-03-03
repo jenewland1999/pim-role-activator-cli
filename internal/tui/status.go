@@ -43,7 +43,7 @@ func PrintStatus(roles []model.ActiveRole, showAppEnv bool) {
 		for _, r := range roles {
 			exp := FormatExpiryDuration(r.ExpiresIn)
 			fmt.Printf("  %-4s │ %-4s │ %-20s │ %-30s │ %-12s │ %-20s │ %-32s\n",
-				r.AppCode, r.Environment, r.ScopeName, r.RoleName, exp, r.Justification, truncate(r.SubscriptionName, 32))
+				r.AppCode, r.Environment, r.ScopeName, r.RoleName, exp, r.Justification, Truncate(r.SubscriptionName, 32))
 		}
 	} else {
 		hdr := fmt.Sprintf("  %-20s │ %-30s │ %-12s │ %-20s │ %-32s",
@@ -53,7 +53,7 @@ func PrintStatus(roles []model.ActiveRole, showAppEnv bool) {
 		for _, r := range roles {
 			exp := FormatExpiryDuration(r.ExpiresIn)
 			fmt.Printf("  %-20s │ %-30s │ %-12s │ %-20s │ %-32s\n",
-				r.ScopeName, r.RoleName, exp, r.Justification, truncate(r.SubscriptionName, 32))
+				r.ScopeName, r.RoleName, exp, r.Justification, Truncate(r.SubscriptionName, 32))
 		}
 	}
 
@@ -82,10 +82,10 @@ func PrintSummary(roles []model.Role, justification, durationLabel string, dryRu
 	for _, r := range roles {
 		if showAppEnv {
 			fmt.Printf("    %s %-4s  %-4s  %-18s  %-30s  %-32s\n",
-				Arrow, r.AppCode, r.Environment, r.ScopeName, r.RoleName, truncate(r.SubscriptionName, 32))
+				Arrow, r.AppCode, r.Environment, r.ScopeName, r.RoleName, Truncate(r.SubscriptionName, 32))
 		} else {
 			fmt.Printf("    %s %-18s  %-30s  %-32s\n",
-				Arrow, r.ScopeName, r.RoleName, truncate(r.SubscriptionName, 32))
+				Arrow, r.ScopeName, r.RoleName, Truncate(r.SubscriptionName, 32))
 		}
 	}
 	fmt.Println("  " + Bold("Justification: ") + justification)

@@ -248,9 +248,9 @@ func runActivate(_ *cobra.Command, _ []string) error {
 				tui.Arrow,
 				r.AppCode,
 				r.Environment,
-				truncate(r.ScopeName, 18),
-				truncate(r.RoleName, 30),
-				truncate(r.SubscriptionName, 32),
+				tui.Truncate(r.ScopeName, 18),
+				tui.Truncate(r.RoleName, 30),
+				tui.Truncate(r.SubscriptionName, 32),
 			)
 		}
 	} else {
@@ -259,9 +259,9 @@ func runActivate(_ *cobra.Command, _ []string) error {
 		for _, r := range selectedRoles {
 			fmt.Printf("  %s %-18s  %-30s  %-32s\n",
 				tui.Arrow,
-				truncate(r.ScopeName, 18),
-				truncate(r.RoleName, 30),
-				truncate(r.SubscriptionName, 32),
+				tui.Truncate(r.ScopeName, 18),
+				tui.Truncate(r.RoleName, 30),
+				tui.Truncate(r.SubscriptionName, 32),
 			)
 		}
 	}
@@ -363,14 +363,7 @@ func runActivate(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-// truncate shortens s to max runes, appending "…" when truncated.
-func truncate(s string, max int) string {
-	runes := []rune(s)
-	if len(runes) <= max {
-		return s
-	}
-	return string(runes[:max-1]) + "…"
-}
+
 
 // ── CLI wiring ────────────────────────────────────────────────────────────────
 
