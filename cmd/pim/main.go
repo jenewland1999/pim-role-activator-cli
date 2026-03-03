@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 	"unicode"
@@ -468,8 +469,8 @@ eligible role assignments via the Azure Resource Manager REST API.`,
 
 	// First-run setup: if no config exists, run the wizard before any command.
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
-		if cmd.Name() == "setup" {
-			return nil // setup manages its own config
+		if cmd.Name() == "setup" || cmd.Name() == "version" {
+			return nil // these commands don't need config
 		}
 		dir := pimDir()
 		if !config.Exists(dir) {
@@ -505,9 +506,19 @@ Run this to add subscriptions, change your principal ID, or update group-select 
 		SilenceErrors: true,
 	}
 
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print version, Go runtime, and platform information",
+		Run: func(_ *cobra.Command, _ []string) {
+			fmt.Printf("pim %s\n", version)
+			fmt.Printf("go  %s\n", runtime.Version())
+			fmt.Printf("os  %s/%s\n", runtime.GOOS, runtime.GOARCH)
+		},
+	}
+
 	rootCmd.PersistentFlags().DurationVar(&apiTimeout, "timeout", defaultAPITimeout, "Timeout for Azure API calls (e.g. 30s, 2m, 5m)")
 
-	rootCmd.AddCommand(activateCmd, setupCmd)
+	rootCmd.AddCommand(activateCmd, setupCmd, versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s %v\n", tui.Cross, err)
