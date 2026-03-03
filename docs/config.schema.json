@@ -60,7 +60,10 @@
     "scope_pattern": {
       "type": "string",
       "description": "A Go-flavour regexp with named capture groups (?P<env>…) and/or (?P<app>…) used to extract environment and application labels from scope (resource group) names. When empty, the App/Env columns are hidden in the role selector.",
-      "examples": ["^.(?P<env>[PQTD]).{5}(?P<app>.{4})", "^rg-(?P<env>\\w+)-(?P<app>\\w+)$"]
+      "examples": [
+        "^.(?P<env>[PQTD]).{5}(?P<app>.{4})",
+        "^rg-(?P<env>\\w+)-(?P<app>\\w+)$"
+      ]
     },
     "env_labels": {
       "type": "object",
