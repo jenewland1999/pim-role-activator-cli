@@ -67,11 +67,11 @@ Running `pim` with no arguments shows a table of currently active PIM roles:
 
   ✔ 3 active PIM role(s):
 
-  App  │ Env  │ Scope                    │ Role                           │ Expires In   │ Justification
-  ──────────────────────────────────────────────────────────────────────────────────────────────────────
-  APP1 │ Prod │ RG-PRD-APP1-001          │ Contributor                    │ 45m          │ Deploy hotfix
-  APP2 │ Prod │ RG-PRD-APP2-001          │ Contributor                    │ 1h 20m       │ Deploy hotfix
-  APP3 │ Prod │ RG-PRD-APP3-001          │ Reader                         │ 3h 55m       │ Investigating issue
+  App  │ Env  │ Scope              │ Role                     │ Expires In │ Justification    │ Subscription
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  APP1 │ Prod │ RG-PRD-APP1-001    │ Contributor              │ 45m        │ Deploy hotfix    │ Shared Services
+  APP2 │ Prod │ RG-PRD-APP2-001    │ Contributor              │ 1h 20m     │ Deploy hotfix    │ Pet Platform
+  APP3 │ Prod │ RG-PRD-APP3-001    │ Reader                   │ 3h 55m     │ Investigating i… │ Corporate Core
 
   Run pim activate to activate more roles.
 ```
@@ -84,6 +84,7 @@ Running `pim` with no arguments shows a table of currently active PIM roles:
 - **Role** — Azure role definition name
 - **Expires In** — Time remaining until activation expires
 - **Justification** — The text entered when activating (from local state)
+- **Subscription** — Display name of the Azure subscription containing the scope
 
 > **Note:** The justification column only shows text for roles activated through
 > this CLI. Roles activated via the Azure Portal will show "—".
@@ -158,6 +159,22 @@ A summary is shown before any API calls are made:
 ────────────────────────────────────────────────────────────────────────
 ```
 
+#### Activation and Results
+
+After confirmation, the CLI submits activation requests and then prints a concise summary:
+
+```text
+Activating 2 role(s)…
+
+─── Activation Results ─────────────────
+  ✔ 2/2 role(s) activated successfully.
+  All selected roles were activated.
+  Run pim to verify active roles.
+───────────────────────────────────────
+```
+
+If any role fails, the summary still shows total success count and then lists only failed roles with error details.
+
 ---
 
 ### Flags
@@ -229,7 +246,7 @@ The cache is automatically used when:
 When the cache is used, you'll see:
 
 ```text
-Using cached roles (1234m until refresh). Use --no-cache to bypass.
+Using cached roles (refreshes in 23h 55m, at Tue 4 Mar 2026 at 09:41). Use --no-cache to bypass.
 ```
 
 To manually clear the cache:

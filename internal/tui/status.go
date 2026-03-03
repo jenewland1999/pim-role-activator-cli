@@ -50,24 +50,36 @@ func printStatusTable(roles []model.ActiveRole, showAppEnv bool, cached bool) {
 	fmt.Println()
 
 	if showAppEnv {
-		hdr := fmt.Sprintf("  %-4s │ %-4s │ %-20s │ %-30s │ %-12s │ %-20s │ %-32s",
+		hdr := fmt.Sprintf("  %-4s │ %-4s │ %-18s │ %-24s │ %-10s │ %-16s │ %-24s",
 			"App", "Env", "Scope", "Role", "Expires In", "Justification", "Subscription")
 		fmt.Println(Bold(hdr))
-		fmt.Println("  " + Dim(strings.Repeat("─", 140)))
+		fmt.Println("  " + Dim(strings.Repeat("─", 122)))
 		for _, r := range roles {
 			exp := FormatExpiryDuration(r.ExpiresIn)
-			fmt.Printf("  %-4s │ %-4s │ %-20s │ %-30s │ %-12s │ %-20s │ %-32s\n",
-				r.AppCode, r.Environment, r.ScopeName, r.RoleName, exp, r.Justification, Truncate(r.SubscriptionName, 32))
+			fmt.Printf("  %-4s │ %-4s │ %-18s │ %-24s │ %-10s │ %-16s │ %-24s\n",
+				displayOrDash(r.AppCode),
+				displayOrDash(r.Environment),
+				Truncate(r.ScopeName, 18),
+				Truncate(r.RoleName, 24),
+				exp,
+				Truncate(displayOrDash(r.Justification), 16),
+				Truncate(r.SubscriptionName, 24),
+			)
 		}
 	} else {
-		hdr := fmt.Sprintf("  %-20s │ %-30s │ %-12s │ %-20s │ %-32s",
+		hdr := fmt.Sprintf("  %-18s │ %-24s │ %-10s │ %-16s │ %-24s",
 			"Scope", "Role", "Expires In", "Justification", "Subscription")
 		fmt.Println(Bold(hdr))
-		fmt.Println("  " + Dim(strings.Repeat("─", 126)))
+		fmt.Println("  " + Dim(strings.Repeat("─", 102)))
 		for _, r := range roles {
 			exp := FormatExpiryDuration(r.ExpiresIn)
-			fmt.Printf("  %-20s │ %-30s │ %-12s │ %-20s │ %-32s\n",
-				r.ScopeName, r.RoleName, exp, r.Justification, Truncate(r.SubscriptionName, 32))
+			fmt.Printf("  %-18s │ %-24s │ %-10s │ %-16s │ %-24s\n",
+				Truncate(r.ScopeName, 18),
+				Truncate(r.RoleName, 24),
+				exp,
+				Truncate(displayOrDash(r.Justification), 16),
+				Truncate(r.SubscriptionName, 24),
+			)
 		}
 	}
 
@@ -113,6 +125,7 @@ func PrintSummary(roles []model.Role, justification, durationLabel string, dryRu
 
 // PrintResults prints the final activation outcome.
 func PrintResults(results []model.ActivationResult) {
+	total := len(results)
 	successes := 0
 	failures := 0
 	for _, r := range results {
@@ -124,10 +137,14 @@ func PrintResults(results []model.ActivationResult) {
 	}
 
 	fmt.Println()
-	fmt.Println(BoldCyan("─── Results ───────────────────────────"))
-	if successes > 0 {
-		fmt.Printf("  %s %d role(s) activated successfully.\n", Check, successes)
+	fmt.Println(BoldCyan("─── Activation Results ─────────────────"))
+	if successes == total {
+		fmt.Printf("  %s %d/%d role(s) activated successfully.\n", Check, successes, total)
+		fmt.Println("  " + Dim("All selected roles were activated."))
+	} else {
+		fmt.Printf("  %s %d/%d role(s) activated successfully.\n", Check, successes, total)
 	}
+
 	if failures > 0 {
 		fmt.Printf("  %s %d role(s) failed to activate:\n", Cross, failures)
 		for _, r := range results {
@@ -136,8 +153,16 @@ func PrintResults(results []model.ActivationResult) {
 			}
 		}
 	}
+	fmt.Println("  " + Dim("Run pim to verify active roles."))
 	fmt.Println(BoldCyan("───────────────────────────────────────"))
 	fmt.Println()
+}
+
+func displayOrDash(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "—"
+	}
+	return value
 }
 
 // FormatExpiryDuration converts a time.Duration to a concise human string.

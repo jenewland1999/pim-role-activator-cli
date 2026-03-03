@@ -32,12 +32,11 @@ After activating roles (via `pim activate` or the Azure Portal), there is a shor
 
 ### Table layout on small screens
 
-The current table layout includes columns for App, Env, Scope, Role, Expires In, Justification, and Subscription. With long justification text this can exceed the terminal width, especially on smaller screens (e.g. laptops at 1080p or split-pane terminals). Future improvements could include:
+The status table includes App, Env, Scope, Role, Expires In, Justification, and Subscription. To keep rows readable on narrower terminals, the CLI truncates lower-priority and long-text fields (notably Justification and Subscription, plus long scope/role values) instead of wrapping rows.
 
-- **Compact/card layout** — render each role as a multi-line card instead of a single table row.
-- **Truncate or omit justification** — only show justification on demand (e.g. `pim --verbose`).
-- **Responsive column selection** — detect terminal width and hide lower-priority columns automatically.
-- **Wrap long values** — allow cell content to wrap within a fixed column width.
+Potential future enhancement:
+
+- **Adaptive layouts** — optionally switch to a compact/card format when terminal width is very constrained.
 
 ## Cache files
 
