@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jenewland1999/pim-role-activator-cli/docs/config.schema.json",
+  "title": "PIM Role Activator CLI Configuration",
+  "description": "User configuration file for the PIM Role Activator CLI, stored at ~/.pim/config.json.",
+  "type": "object",
+  "required": ["subscriptions", "principal_id"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional JSON Schema reference for editor autocompletion."
+    },
+    "subscriptions": {
+      "type": "array",
+      "description": "One or more Azure subscriptions to manage PIM roles for. At least one entry is required.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Azure subscription UUID.",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "examples": ["5a325a18-5032-42f2-8cfb-02eee35d5304"]
+          },
+          "name": {
+            "type": "string",
+            "description": "Friendly display name shown in the role selector.",
+            "minLength": 1,
+            "examples": ["Production", "Development"]
+          }
+        }
+      }
+    },
+    "principal_id": {
+      "type": "string",
+      "description": "Your Entra ID (Azure AD) Object ID. Found in Azure Portal → Entra ID → Users → your profile → Object ID. Used to scope PIM eligible-role queries to your identity.",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+      "examples": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890"]
+    },
+    "quick_select_patterns": {
+      "type": "array",
+      "description": "Substrings used by the 'g' group-select hotkey in the role selector. Pressing 'g' selects all roles whose scope name contains any of these strings.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "examples": [["APP2", "APP4", "APP5"]]
+    },
+    "cache_ttl_hours": {
+      "type": "integer",
+      "description": "How long (in hours) to cache eligible roles before re-fetching from the Azure API. Defaults to 24 when omitted or set to 0.",
+      "minimum": 1,
+      "default": 24,
+      "examples": [12, 24, 48]
+    },
+    "scope_pattern": {
+      "type": "string",
+      "description": "A Go-flavour regexp with named capture groups (?P<env>…) and/or (?P<app>…) used to extract environment and application labels from scope (resource group) names. When empty, the App/Env columns are hidden in the role selector.",
+      "examples": ["^.(?P<env>[PQTD]).{5}(?P<app>.{4})", "^rg-(?P<env>\\w+)-(?P<app>\\w+)$"]
+    },
+    "env_labels": {
+      "type": "object",
+      "description": "Maps raw decoded environment values (from the scope_pattern 'env' capture group) to friendly display labels. When empty, the raw captured value is shown as-is.",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "examples": [{ "P": "Prod", "D": "Dev", "Q": "QA", "T": "Test" }]
+    },
+    "durations": {
+      "type": "array",
+      "description": "Custom activation duration options presented in the duration picker. Overrides the built-in defaults (30 minutes, 1 hour, 2 hours, 4 hours). When empty or omitted, the defaults are used.",
+      "items": {
+        "type": "object",
+        "required": ["label", "iso8601", "minutes"],
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Human-readable label shown in the duration picker.",
+            "minLength": 1,
+            "examples": ["30 minutes", "1 hour", "8 hours"]
+          },
+          "iso8601": {
+            "type": "string",
+            "description": "ISO 8601 duration string sent to the Azure PIM API.",
+            "pattern": "^PT?[0-9]+[HM]$",
+            "examples": ["PT30M", "PT1H", "PT8H"]
+          },
+          "minutes": {
+            "type": "integer",
+            "description": "Duration in minutes, used to compute the local expiry time.",
+            "minimum": 1,
+            "examples": [30, 60, 480]
+          }
+        }
+      }
+    }
+  }
+}

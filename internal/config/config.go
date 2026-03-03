@@ -33,11 +33,29 @@ type DurationConfig struct {
 }
 
 // UserConfig is the persistent user configuration stored in ~/.pim/config.json.
+//
+// A JSON schema is available at docs/config.schema.json and can be referenced
+// from the config file via the optional "$schema" field for editor
+// autocompletion.
 type UserConfig struct {
-	Subscriptions       []Subscription `json:"subscriptions"`
-	PrincipalID         string         `json:"principal_id"`
-	GroupSelectPatterns []string       `json:"quick_select_patterns"`
-	CacheTTLHours       int            `json:"cache_ttl_hours,omitempty"`
+	// Schema is an optional JSON Schema URI for editor autocompletion.
+	// Example: "https://github.com/jenewland1999/pim-role-activator-cli/docs/config.schema.json"
+	Schema string `json:"$schema,omitempty"`
+	// Subscriptions lists the Azure subscriptions to manage. At least one
+	// entry is required; each entry provides the subscription UUID ("id")
+	// and a friendly display name ("name").
+	Subscriptions []Subscription `json:"subscriptions"`
+	// PrincipalID is the Entra ID (Azure AD) Object ID of the authenticated
+	// user. Used to scope PIM eligible-role queries to the current identity.
+	PrincipalID string `json:"principal_id"`
+	// GroupSelectPatterns holds substrings matched by the 'g' group-select
+	// hotkey in the role selector. Pressing 'g' selects all roles whose
+	// scope name contains any of these strings.
+	GroupSelectPatterns []string `json:"quick_select_patterns"`
+	// CacheTTLHours controls how long (in hours) eligible roles are cached
+	// before being re-fetched from the Azure API. Defaults to 24 when
+	// omitted or ≤ 0.
+	CacheTTLHours int `json:"cache_ttl_hours,omitempty"`
 	// ScopePattern is an optional Go regexp with named capture groups used to
 	// extract "env" and "app" labels from scope (resource-group) names.
 	// Example: `^.(?P<env>[PQTD]).{5}(?P<app>.{4})`
