@@ -3,6 +3,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -64,7 +65,26 @@ func (c *UserConfig) Scopes() []string {
 	return scopes
 }
 
-// Load reads and deserialises the config file from dir.
+// Validate checks that the config contains the minimum required fields for
+// normal operation. Returns a descriptive error directing the user to run
+// 'pim setup' when essential fields are missing.
+func (c *UserConfig) Validate() error {
+	var errs []error
+	if c.PrincipalID == "" {
+		errs = append(errs, fmt.Errorf("principal_id is empty"))
+	}
+	if len(c.Subscriptions) == 0 {
+		errs = append(errs, fmt.Errorf("no subscriptions configured"))
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("config: invalid configuration (%w); run 'pim setup' to reconfigure", errors.Join(errs...))
+	}
+	return nil
+}
+
+// Load reads, deserialises, and validates the config file from dir.
+// Returns an error if the file cannot be read, contains invalid JSON, or
+// is missing required fields (principal_id, subscriptions).
 func Load(dir string) (*UserConfig, error) {
 	p := filepath.Join(dir, configFile)
 	data, err := os.ReadFile(p)
@@ -74,6 +94,9 @@ func Load(dir string) (*UserConfig, error) {
 	var cfg UserConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("config: parse %s: %w", p, err)
+	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
 	}
 	return &cfg, nil
 }

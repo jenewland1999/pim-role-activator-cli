@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -82,15 +83,18 @@ func TestLoad_EmptyObject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Load(dir)
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
+	_, err := Load(dir)
+	if err == nil {
+		t.Fatal("Load() with empty object returned nil error, want validation error")
 	}
-	if got.PrincipalID != "" {
-		t.Errorf("PrincipalID = %q, want empty", got.PrincipalID)
+	if !strings.Contains(err.Error(), "principal_id is empty") {
+		t.Errorf("error = %q, want mention of principal_id", err)
 	}
-	if len(got.Subscriptions) != 0 {
-		t.Errorf("Subscriptions length = %d, want 0", len(got.Subscriptions))
+	if !strings.Contains(err.Error(), "no subscriptions configured") {
+		t.Errorf("error = %q, want mention of subscriptions", err)
+	}
+	if !strings.Contains(err.Error(), "pim setup") {
+		t.Errorf("error = %q, want mention of 'pim setup'", err)
 	}
 }
 
@@ -179,12 +183,12 @@ func TestSave_DirectoryPermissions(t *testing.T) {
 func TestSave_OverwritesExisting(t *testing.T) {
 	dir := t.TempDir()
 
-	cfg1 := &UserConfig{PrincipalID: "first"}
+	cfg1 := &UserConfig{PrincipalID: "first", Subscriptions: []Subscription{{ID: "s1", Name: "S1"}}}
 	if err := Save(dir, cfg1); err != nil {
 		t.Fatalf("Save(first) error: %v", err)
 	}
 
-	cfg2 := &UserConfig{PrincipalID: "second"}
+	cfg2 := &UserConfig{PrincipalID: "second", Subscriptions: []Subscription{{ID: "s2", Name: "S2"}}}
 	if err := Save(dir, cfg2); err != nil {
 		t.Fatalf("Save(second) error: %v", err)
 	}
@@ -391,6 +395,75 @@ func TestScopes_SingleSubscription(t *testing.T) {
 	want := "/subscriptions/one-sub"
 	if got[0] != want {
 		t.Errorf("Scopes()[0] = %q, want %q", got[0], want)
+	}
+}
+
+// --- Validate ---
+
+func TestValidate_Valid(t *testing.T) {
+	cfg := &UserConfig{
+		PrincipalID:   "abc-123",
+		Subscriptions: []Subscription{{ID: "sub-1", Name: "Dev"}},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate() = %v, want nil", err)
+	}
+}
+
+func TestValidate_MissingPrincipalID(t *testing.T) {
+	cfg := &UserConfig{
+		Subscriptions: []Subscription{{ID: "sub-1", Name: "Dev"}},
+	}
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() = nil, want error for missing principal_id")
+	}
+	if !strings.Contains(err.Error(), "principal_id is empty") {
+		t.Errorf("error = %q, want mention of principal_id", err)
+	}
+	if !strings.Contains(err.Error(), "pim setup") {
+		t.Errorf("error = %q, want mention of 'pim setup'", err)
+	}
+}
+
+func TestValidate_MissingSubscriptions(t *testing.T) {
+	cfg := &UserConfig{
+		PrincipalID: "abc-123",
+	}
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() = nil, want error for missing subscriptions")
+	}
+	if !strings.Contains(err.Error(), "no subscriptions configured") {
+		t.Errorf("error = %q, want mention of subscriptions", err)
+	}
+}
+
+func TestValidate_BothMissing(t *testing.T) {
+	cfg := &UserConfig{}
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() = nil, want error for empty config")
+	}
+	if !strings.Contains(err.Error(), "principal_id is empty") {
+		t.Errorf("error = %q, want mention of principal_id", err)
+	}
+	if !strings.Contains(err.Error(), "no subscriptions configured") {
+		t.Errorf("error = %q, want mention of subscriptions", err)
+	}
+}
+
+func TestValidate_EmptySubscriptionsSlice(t *testing.T) {
+	cfg := &UserConfig{
+		PrincipalID:   "abc-123",
+		Subscriptions: []Subscription{},
+	}
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() = nil, want error for empty subscriptions slice")
+	}
+	if !strings.Contains(err.Error(), "no subscriptions configured") {
+		t.Errorf("error = %q, want mention of subscriptions", err)
 	}
 }
 
