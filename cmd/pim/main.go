@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -80,8 +83,8 @@ func pimDir() string {
 
 // ── Status mode ───────────────────────────────────────────────────────────────
 
-func runStatus(_ *cobra.Command, _ []string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+func runStatus(cmd *cobra.Command, _ []string) error {
+	ctx, cancel := context.WithTimeout(cmd.Context(), apiTimeout)
 	defer cancel()
 	dir := pimDir()
 
@@ -176,8 +179,8 @@ func runStatus(_ *cobra.Command, _ []string) error {
 
 // ── Activate mode ─────────────────────────────────────────────────────────────
 
-func runActivate(_ *cobra.Command, _ []string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+func runActivate(cmd *cobra.Command, _ []string) error {
+	ctx, cancel := context.WithTimeout(cmd.Context(), apiTimeout)
 	defer cancel()
 	dir := pimDir()
 
@@ -427,8 +430,8 @@ func runActivate(_ *cobra.Command, _ []string) error {
 // ── CLI wiring ────────────────────────────────────────────────────────────────
 
 // runSetup runs the interactive configuration wizard.
-func runSetup(_ *cobra.Command, _ []string) error {
-	ctx := context.Background()
+func runSetup(cmd *cobra.Command, _ []string) error {
+	ctx := cmd.Context()
 	dir := pimDir()
 
 	var suggestedOID string
@@ -457,6 +460,12 @@ func runSetup(_ *cobra.Command, _ []string) error {
 }
 
 func main() {
+	// Register a signal-aware root context so that SIGINT (Ctrl+C) and
+	// SIGTERM cancel in-flight API calls cleanly instead of killing the
+	// process mid-request.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	rootCmd := &cobra.Command{
 		Use:     "pim",
 		Short:   "PIM Role Activator CLI",
@@ -519,9 +528,14 @@ Run this to add subscriptions, change your principal ID, or update group-select 
 
 	rootCmd.PersistentFlags().DurationVar(&apiTimeout, "timeout", defaultAPITimeout, "Timeout for Azure API calls (e.g. 30s, 2m, 5m)")
 
+	rootCmd.SetContext(ctx)
 	rootCmd.AddCommand(activateCmd, setupCmd, versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
+		if errors.Is(err, context.Canceled) {
+			fmt.Fprintln(os.Stderr, "\nInterrupted.")
+			os.Exit(130) // 128 + SIGINT
+		}
 		slog.Error("command failed", "err", err)
 		os.Exit(1)
 	}
