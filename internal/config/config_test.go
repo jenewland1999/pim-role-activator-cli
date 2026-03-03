@@ -353,6 +353,37 @@ func TestParsedScopePattern_SimpleMatch(t *testing.T) {
 	}
 }
 
+func TestParsedScopePattern_CachedBetweenCalls(t *testing.T) {
+	cfg := &UserConfig{ScopePattern: `^rg-(?P<env>\w+)$`}
+
+	re1, err := cfg.ParsedScopePattern()
+	if err != nil {
+		t.Fatalf("first call error: %v", err)
+	}
+	re2, err := cfg.ParsedScopePattern()
+	if err != nil {
+		t.Fatalf("second call error: %v", err)
+	}
+
+	if re1 != re2 {
+		t.Errorf("ParsedScopePattern() returned different pointers: %p vs %p; want cached result", re1, re2)
+	}
+}
+
+func TestParsedScopePattern_CachedError(t *testing.T) {
+	cfg := &UserConfig{ScopePattern: `[invalid`}
+
+	_, err1 := cfg.ParsedScopePattern()
+	_, err2 := cfg.ParsedScopePattern()
+
+	if err1 == nil || err2 == nil {
+		t.Fatal("expected error from invalid pattern on both calls")
+	}
+	if err1 != err2 {
+		t.Errorf("error changed between calls: %v vs %v; want cached error", err1, err2)
+	}
+}
+
 // --- Scopes ---
 
 func TestScopes_MultipleSubscriptions(t *testing.T) {

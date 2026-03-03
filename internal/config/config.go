@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/jenewland1999/pim-role-activator-cli/internal/model"
@@ -49,15 +50,25 @@ type UserConfig struct {
 	// Durations overrides the default activation duration options (30m/1h/2h/4h).
 	// When empty or omitted, the built-in defaults are used.
 	Durations []DurationConfig `json:"durations,omitempty"`
+
+	// Cached compiled scope pattern (unexported — excluded from JSON).
+	scopeOnce   sync.Once
+	scopeRegexp *regexp.Regexp
+	scopeErr    error
 }
 
-// ParsedScopePattern compiles and returns the configured ScopePattern regexp,
-// or nil when no pattern is set. Returns an error if the pattern is invalid.
+// ParsedScopePattern returns the compiled ScopePattern regexp, compiling and
+// caching it on the first call. Returns nil when no pattern is configured.
+// The result is cached via sync.Once so repeated calls avoid redundant work
+// and are safe for concurrent use.
 func (c *UserConfig) ParsedScopePattern() (*regexp.Regexp, error) {
 	if c.ScopePattern == "" {
 		return nil, nil
 	}
-	return regexp.Compile(c.ScopePattern)
+	c.scopeOnce.Do(func() {
+		c.scopeRegexp, c.scopeErr = regexp.Compile(c.ScopePattern)
+	})
+	return c.scopeRegexp, c.scopeErr
 }
 
 // CacheTTL returns the configured cache duration, defaulting to 24 hours.
