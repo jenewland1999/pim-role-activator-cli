@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +26,7 @@ func newStore(t *testing.T) (*Store, *bytes.Buffer) {
 	dir := t.TempDir()
 	var buf bytes.Buffer
 	s := New(filepath.Join(dir, "activations.json"))
-	s.Stderr = &buf
+	s.Logger = slog.New(slog.NewTextHandler(&buf, nil))
 	return s, &buf
 }
 

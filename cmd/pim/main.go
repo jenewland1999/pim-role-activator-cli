@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -67,12 +68,12 @@ func validateJustification(s string) error {
 func pimDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: could not determine home directory: %v\n", err)
+		slog.Error("could not determine home directory", "err", err)
 		os.Exit(1)
 	}
 	dir := filepath.Join(home, ".pim")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not create %s: %v\n", dir, err)
+		slog.Warn("could not create config directory", "path", dir, "err", err)
 	}
 	return dir
 }
@@ -146,7 +147,7 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	}); err != nil {
 		if cacheHit {
 			// We already showed cached results — warn but don't fail hard.
-			fmt.Fprintf(os.Stderr, "  %s Could not refresh active roles: %v\n", tui.Cross, err)
+			slog.Warn("could not refresh active roles", "err", err)
 			return nil
 		}
 		return fmt.Errorf("%s Failed to fetch active role assignments: %w", tui.Cross, err)
@@ -155,7 +156,7 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	// Persist fresh results to cache.
 	if len(allRoles) > 0 {
 		if saveErr := cache.SaveActiveRoles(dir, cfg.CacheTTL(), allRoles); saveErr != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not cache active roles: %v\n", saveErr)
+			slog.Warn("could not cache active roles", "err", saveErr)
 		}
 	}
 
@@ -413,7 +414,7 @@ func runActivate(_ *cobra.Command, _ []string) error {
 
 	if len(newRecords) > 0 {
 		if appendErr := stateStore.Append(newRecords); appendErr != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not persist activation state: %v\n", appendErr)
+			slog.Warn("could not persist activation state", "err", appendErr)
 		}
 	}
 
@@ -521,7 +522,7 @@ Run this to add subscriptions, change your principal ID, or update group-select 
 	rootCmd.AddCommand(activateCmd, setupCmd, versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s %v\n", tui.Cross, err)
+		slog.Error("command failed", "err", err)
 		os.Exit(1)
 	}
 }
