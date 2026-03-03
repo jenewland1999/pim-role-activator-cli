@@ -39,12 +39,14 @@ import (
 var version = "dev"
 
 var (
-	dryRun     bool
-	noCache    bool
-	apiTimeout time.Duration
+	dryRun       bool
+	noCache      bool
+	debugTimings bool
+	apiTimeout   time.Duration
 )
 
 const defaultAPITimeout = 2 * time.Minute
+const identityLookupTimeout = 250 * time.Millisecond
 
 // maxJustificationLen is the maximum number of runes allowed in a justification
 // string. Azure PIM does not formally document a limit, but 500 characters is a
@@ -83,9 +85,44 @@ func pimDir() string {
 	return dir
 }
 
+func configureLogger() {
+	level := new(slog.LevelVar)
+	if debugTimings {
+		level.Set(slog.LevelDebug)
+	} else {
+		level.Set(slog.LevelInfo)
+	}
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+	slog.SetDefault(slog.New(handler))
+}
+
+func logPhaseTiming(phase string, start time.Time, attrs ...any) {
+	if !debugTimings {
+		return
+	}
+	fields := append([]any{"phase", phase, "elapsed_ms", time.Since(start).Milliseconds()}, attrs...)
+	slog.Debug("timing", fields...)
+}
+
+func maybePrintIdentity(ctx context.Context, cred azcore.TokenCredential, source string) {
+	start := time.Now()
+	claimsCtx, cancel := context.WithTimeout(ctx, identityLookupTimeout)
+	defer cancel()
+
+	claims, err := azure.GetTokenClaims(claimsCtx, cred)
+	if err != nil {
+		logPhaseTiming("identity_lookup", start, "source", source, "ok", false, "err", err)
+		return
+	}
+
+	logPhaseTiming("identity_lookup", start, "source", source, "ok", true)
+	fmt.Printf("  %s Signed in as %s\n\n", tui.Check, tui.Cyan(claims.DisplayName()))
+}
+
 // ── Status mode ───────────────────────────────────────────────────────────────
 
 func runStatus(cmd *cobra.Command, _ []string) error {
+	cmdStart := time.Now()
 	ctx, cancel := context.WithTimeout(cmd.Context(), apiTimeout)
 	defer cancel()
 	dir := pimDir()
@@ -107,27 +144,28 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 
 	tui.PrintBanner(false)
 
-	var cred azcore.TokenCredential
-	if err := tui.RunWithSpinner("Authenticating with Azure…", func() error {
-		var e error
-		cred, e = azure.NewCredential()
-		return e
-	}); err != nil {
-		return fmt.Errorf("%s %w", tui.Cross, err)
-	}
-
-	if claims, claimErr := azure.GetTokenClaims(ctx, cred); claimErr == nil {
-		fmt.Printf("  %s Signed in as %s\n\n", tui.Check, tui.Cyan(claims.DisplayName()))
-	}
-
-	storeFile := filepath.Join(dir, "activations.json")
-	justMap := state.New(storeFile).LookupJustification()
-
 	// ── Fast path: show cached active roles immediately ──────────────────────
 	cachedRoles, cacheHit := cache.LoadActiveRoles(dir, cfg.CacheTTL())
 	if cacheHit {
 		tui.PrintCachedStatus(cachedRoles, showAppEnv)
 	}
+
+	var cred azcore.TokenCredential
+	authStart := time.Now()
+	if err := tui.RunWithSpinner("Authenticating with Azure…", func() error {
+		var e error
+		cred, e = azure.NewCredential()
+		return e
+	}); err != nil {
+		logPhaseTiming("status_auth", authStart, "ok", false)
+		return fmt.Errorf("%s %w", tui.Cross, err)
+	}
+	logPhaseTiming("status_auth", authStart, "ok", true)
+
+	maybePrintIdentity(ctx, cred, "status")
+
+	storeFile := filepath.Join(dir, "activations.json")
+	justMap := state.New(storeFile).LookupJustification()
 
 	// ── Refresh from API ─────────────────────────────────────────────────────
 	spinnerMsg := "Checking active PIM roles…"
@@ -136,6 +174,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	}
 
 	var allRoles []model.ActiveRole
+	refreshStart := time.Now()
 	if err := tui.RunWithSpinner(spinnerMsg, func() error {
 		g, gctx := errgroup.WithContext(ctx)
 		var mu sync.Mutex
@@ -157,6 +196,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		}
 		return g.Wait()
 	}); err != nil {
+		logPhaseTiming("status_refresh_active_roles", refreshStart, "ok", false, "subscription_count", len(cfg.Subscriptions), "cache_hit", cacheHit)
 		if cacheHit {
 			// We already showed cached results — warn but don't fail hard.
 			slog.Warn("could not refresh active roles", "err", err)
@@ -164,6 +204,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		}
 		return fmt.Errorf("%s Failed to fetch active role assignments: %w", tui.Cross, err)
 	}
+	logPhaseTiming("status_refresh_active_roles", refreshStart, "ok", true, "subscription_count", len(cfg.Subscriptions), "cache_hit", cacheHit, "active_roles", len(allRoles))
 
 	// Persist fresh results to cache.
 	if len(allRoles) > 0 {
@@ -183,12 +224,14 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	} else {
 		tui.PrintStatus(allRoles, showAppEnv)
 	}
+	logPhaseTiming("status_total", cmdStart, "cache_hit", cacheHit, "subscriptions", len(cfg.Subscriptions), "active_roles", len(allRoles))
 	return nil
 }
 
 // ── Activate mode ─────────────────────────────────────────────────────────────
 
 func runActivate(cmd *cobra.Command, _ []string) error {
+	cmdStart := time.Now()
 	ctx, cancel := context.WithTimeout(cmd.Context(), apiTimeout)
 	defer cancel()
 	dir := pimDir()
@@ -212,17 +255,18 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 	tui.PrintBanner(dryRun)
 
 	var cred azcore.TokenCredential
+	authStart := time.Now()
 	if err := tui.RunWithSpinner("Authenticating with Azure…", func() error {
 		var e error
 		cred, e = azure.NewCredential()
 		return e
 	}); err != nil {
+		logPhaseTiming("activate_auth", authStart, "ok", false)
 		return fmt.Errorf("%s %w", tui.Cross, err)
 	}
+	logPhaseTiming("activate_auth", authStart, "ok", true)
 
-	if claims, claimErr := azure.GetTokenClaims(ctx, cred); claimErr == nil {
-		fmt.Printf("  %s Signed in as %s\n\n", tui.Check, tui.Cyan(claims.DisplayName()))
-	}
+	maybePrintIdentity(ctx, cred, "activate")
 
 	// Build an activation client from the first subscription. The scope is
 	// embedded per-request so this single client works across all subscriptions.
@@ -272,6 +316,7 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	eligibleFetchStart := time.Now()
 	if eligibleRoles == nil {
 		if err := tui.RunWithSpinner("Fetching eligible PIM roles…", func() error {
 			g, gctx := errgroup.WithContext(ctx)
@@ -294,11 +339,15 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 			}
 			return g.Wait()
 		}); err != nil {
+			logPhaseTiming("activate_fetch_eligible_roles", eligibleFetchStart, "ok", false, "subscription_count", len(cfg.Subscriptions))
 			return fmt.Errorf("%s Failed to fetch eligible roles: %w", tui.Cross, err)
 		}
+		logPhaseTiming("activate_fetch_eligible_roles", eligibleFetchStart, "ok", true, "subscription_count", len(cfg.Subscriptions), "eligible_roles", len(eligibleRoles), "cache_hit", false)
 		if data, mErr := json.Marshal(eligibleRoles); mErr == nil {
 			_ = roleCache.Set(data)
 		}
+	} else {
+		logPhaseTiming("activate_fetch_eligible_roles", eligibleFetchStart, "ok", true, "subscription_count", len(cfg.Subscriptions), "eligible_roles", len(eligibleRoles), "cache_hit", true)
 	}
 
 	if len(eligibleRoles) == 0 {
@@ -413,7 +462,17 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 
 	// ── Parallel activation ───────────────────────────────────────────────────
 	fmt.Println()
-	results := azure.ActivateRoles(ctx, activationClients.Activation, selectedRoles, cfg.PrincipalID, justification, duration)
+	var results []model.ActivationResult
+	activateMsg := fmt.Sprintf("Activating %d role(s)…", len(selectedRoles))
+	activationStart := time.Now()
+	if err := tui.RunWithSpinner(activateMsg, func() error {
+		results = azure.ActivateRoles(ctx, activationClients.Activation, selectedRoles, cfg.PrincipalID, justification, duration)
+		return nil
+	}); err != nil {
+		logPhaseTiming("activate_submit", activationStart, "ok", false, "selected_roles", len(selectedRoles))
+		return fmt.Errorf("%s activation failed: %w", tui.Cross, err)
+	}
+	logPhaseTiming("activate_submit", activationStart, "ok", true, "selected_roles", len(selectedRoles))
 
 	// ── Persist state ─────────────────────────────────────────────────────────
 	storeFile := filepath.Join(dir, "activations.json")
@@ -444,10 +503,9 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 	}
 
 	tui.PrintResults(results)
+	logPhaseTiming("activate_total", cmdStart, "eligible_roles", len(eligibleRoles), "selected_roles", len(selectedRoles))
 	return nil
 }
-
-
 
 // ── CLI wiring ────────────────────────────────────────────────────────────────
 
@@ -502,6 +560,7 @@ eligible role assignments via the Azure Resource Manager REST API.`,
 
 	// First-run setup: if no config exists, run the wizard before any command.
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
+		configureLogger()
 		if cmd.Name() == "setup" || cmd.Name() == "version" {
 			return nil // these commands don't need config
 		}
@@ -529,6 +588,16 @@ the selected roles after prompting for justification and duration.`,
 	activateCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Walk through prompts without sending activation requests")
 	activateCmd.Flags().BoolVar(&noCache, "no-cache", false, "Bypass the 24-hour eligible roles cache")
 
+	statusCmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show currently active PIM roles",
+		Long: `Displays currently active Azure PIM role assignments and their remaining
+activation time. This is also the default command when no subcommand is provided.`,
+		RunE:          runStatus,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+
 	setupCmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Configure the CLI (subscriptions, principal ID, group patterns)",
@@ -550,9 +619,10 @@ Run this to add subscriptions, change your principal ID, or update group-select 
 	}
 
 	rootCmd.PersistentFlags().DurationVar(&apiTimeout, "timeout", defaultAPITimeout, "Timeout for Azure API calls (e.g. 30s, 2m, 5m)")
+	rootCmd.PersistentFlags().BoolVar(&debugTimings, "debug-timings", false, "Emit debug timing logs for command stages")
 
 	rootCmd.SetContext(ctx)
-	rootCmd.AddCommand(activateCmd, setupCmd, versionCmd)
+	rootCmd.AddCommand(statusCmd, activateCmd, setupCmd, versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		if errors.Is(err, context.Canceled) {

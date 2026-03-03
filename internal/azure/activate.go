@@ -15,6 +15,9 @@ import (
 var (
 	newRequestID = func() string { return uuid.New().String() }
 	nowUTC       = func() time.Time { return time.Now().UTC() }
+	// Keep activation fan-out conservative to reduce ARM/PIM throttling tail
+	// latency when many roles are selected at once.
+	activationConcurrencyLimit          = 4
 	createRoleAssignmentScheduleRequest = func(
 		ctx context.Context,
 		client *armauthorization.RoleAssignmentScheduleRequestsClient,
@@ -39,35 +42,56 @@ func ActivateRoles(
 	duration model.DurationOption,
 ) []model.ActivationResult {
 	results := make([]model.ActivationResult, len(roles))
-	var wg sync.WaitGroup
+	if len(roles) == 0 {
+		return results
+	}
 
-	for i, role := range roles {
+	workers := activationConcurrencyLimit
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > len(roles) {
+		workers = len(roles)
+	}
+
+	var wg sync.WaitGroup
+	jobs := make(chan int)
+
+	for range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			requestID := newRequestID()
-			startTime := nowUTC()
+			for i := range jobs {
+				role := roles[i]
+				requestID := newRequestID()
+				startTime := nowUTC()
 
-			req := armauthorization.RoleAssignmentScheduleRequest{
-				Properties: &armauthorization.RoleAssignmentScheduleRequestProperties{
-					PrincipalID:      to.Ptr(principalID),
-					RoleDefinitionID: to.Ptr(role.RoleDefinitionID),
-					RequestType:      to.Ptr(armauthorization.RequestTypeSelfActivate),
-					Justification:    to.Ptr(justification),
-					ScheduleInfo: &armauthorization.RoleAssignmentScheduleRequestPropertiesScheduleInfo{
-						StartDateTime: to.Ptr(startTime),
-						Expiration: &armauthorization.RoleAssignmentScheduleRequestPropertiesScheduleInfoExpiration{
-							Type:     to.Ptr(armauthorization.TypeAfterDuration),
-							Duration: to.Ptr(duration.ISO8601),
+				req := armauthorization.RoleAssignmentScheduleRequest{
+					Properties: &armauthorization.RoleAssignmentScheduleRequestProperties{
+						PrincipalID:      to.Ptr(principalID),
+						RoleDefinitionID: to.Ptr(role.RoleDefinitionID),
+						RequestType:      to.Ptr(armauthorization.RequestTypeSelfActivate),
+						Justification:    to.Ptr(justification),
+						ScheduleInfo: &armauthorization.RoleAssignmentScheduleRequestPropertiesScheduleInfo{
+							StartDateTime: to.Ptr(startTime),
+							Expiration: &armauthorization.RoleAssignmentScheduleRequestPropertiesScheduleInfoExpiration{
+								Type:     to.Ptr(armauthorization.TypeAfterDuration),
+								Duration: to.Ptr(duration.ISO8601),
+							},
 						},
 					},
-				},
-			}
+				}
 
-			err := createRoleAssignmentScheduleRequest(ctx, client, role.Scope, requestID, req)
-			results[i] = model.ActivationResult{Role: role, Err: err}
+				err := createRoleAssignmentScheduleRequest(ctx, client, role.Scope, requestID, req)
+				results[i] = model.ActivationResult{Role: role, Err: err}
+			}
 		}()
 	}
+
+	for i := range roles {
+		jobs <- i
+	}
+	close(jobs)
 
 	wg.Wait()
 	return results

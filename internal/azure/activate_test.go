@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -139,6 +140,55 @@ func TestActivateRoles_AttemptsAllRoles_AndPreservesResultIndex(t *testing.T) {
 		if req.Properties.ScheduleInfo.StartDateTime == nil || !req.Properties.ScheduleInfo.StartDateTime.Equal(fixedNow) {
 			t.Fatalf("startDateTime = %v, want %v", req.Properties.ScheduleInfo.StartDateTime, fixedNow)
 		}
+	}
+}
+
+func TestActivateRoles_HonorsConcurrencyLimit(t *testing.T) {
+	originalCreate := createRoleAssignmentScheduleRequest
+	originalLimit := activationConcurrencyLimit
+	defer func() {
+		createRoleAssignmentScheduleRequest = originalCreate
+		activationConcurrencyLimit = originalLimit
+	}()
+
+	activationConcurrencyLimit = 2
+
+	roles := []model.Role{
+		{RoleName: "r1", Scope: "/subscriptions/s1/resourceGroups/rg1", RoleDefinitionID: "rd1"},
+		{RoleName: "r2", Scope: "/subscriptions/s1/resourceGroups/rg2", RoleDefinitionID: "rd2"},
+		{RoleName: "r3", Scope: "/subscriptions/s1/resourceGroups/rg3", RoleDefinitionID: "rd3"},
+		{RoleName: "r4", Scope: "/subscriptions/s1/resourceGroups/rg4", RoleDefinitionID: "rd4"},
+		{RoleName: "r5", Scope: "/subscriptions/s1/resourceGroups/rg5", RoleDefinitionID: "rd5"},
+	}
+
+	var inFlight int32
+	var maxInFlight int32
+
+	createRoleAssignmentScheduleRequest = func(
+		_ context.Context,
+		_ *armauthorization.RoleAssignmentScheduleRequestsClient,
+		_ string,
+		_ string,
+		_ armauthorization.RoleAssignmentScheduleRequest,
+	) error {
+		current := atomic.AddInt32(&inFlight, 1)
+		for {
+			prev := atomic.LoadInt32(&maxInFlight)
+			if current <= prev || atomic.CompareAndSwapInt32(&maxInFlight, prev, current) {
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+		atomic.AddInt32(&inFlight, -1)
+		return nil
+	}
+
+	results := ActivateRoles(context.Background(), nil, roles, "principal", "justification", model.DurationOption{Label: "1 hour", ISO8601: "PT1H", Duration: time.Hour})
+	if len(results) != len(roles) {
+		t.Fatalf("len(results) = %d, want %d", len(results), len(roles))
+	}
+	if got := atomic.LoadInt32(&maxInFlight); got > int32(activationConcurrencyLimit) {
+		t.Fatalf("max in-flight calls = %d, want <= %d", got, activationConcurrencyLimit)
 	}
 }
 
