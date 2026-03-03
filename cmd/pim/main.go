@@ -24,6 +24,13 @@ import (
 	"github.com/jenewland1999/pim-role-activator-cli/internal/tui"
 )
 
+// version is set at build time via:
+//
+//	go build -ldflags "-X main.version=1.2.3"
+//
+// When not set (i.e. during local development) it defaults to "dev".
+var version = "dev"
+
 var (
 	dryRun     bool
 	noCache    bool
@@ -449,8 +456,9 @@ func runSetup(_ *cobra.Command, _ []string) error {
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "pim",
-		Short: "PIM Role Activator CLI",
+		Use:     "pim",
+		Short:   "PIM Role Activator CLI",
+		Version: version,
 		Long: `An interactive CLI for activating Azure PIM (Privileged Identity Management)
 eligible role assignments via the Azure Resource Manager REST API.`,
 		RunE:          runStatus,
