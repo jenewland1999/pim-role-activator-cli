@@ -28,7 +28,6 @@ func ActivateRoles(
 	g, ctx := errgroup.WithContext(ctx)
 
 	for i, role := range roles {
-		i, role := i, role // capture loop variables for goroutine
 		g.Go(func() error {
 			requestID := uuid.New().String()
 			startTime := time.Now().UTC()
