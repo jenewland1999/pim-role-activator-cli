@@ -62,9 +62,6 @@ func PrintStatus(roles []model.ActiveRole, showAppEnv bool) {
 	fmt.Println()
 }
 
-// formatDuration converts a time.Duration into a concise human-readable string.
-func formatDuration(d model.ActiveRole) string { return "" } // avoid import cycle; use inline below
-
 // PrintSummary displays the pre-activation confirmation table.
 // showAppEnv should be true when a scope_pattern is configured in UserConfig.
 func PrintSummary(roles []model.Role, justification, durationLabel string, dryRun bool, showAppEnv bool) {
