@@ -11,6 +11,22 @@ import (
 	"github.com/jenewland1999/pim-role-activator-cli/internal/model"
 )
 
+// StateStore abstracts activation record persistence, enabling unit tests to
+// substitute an in-memory implementation without touching the filesystem.
+type StateStore interface {
+	// Load reads all non-expired activation records.
+	Load() ([]model.ActivationRecord, error)
+	// Save persists records, replacing any existing data.
+	Save(records []model.ActivationRecord) error
+	// Append merges new records with existing ones and saves.
+	Append(newRecords []model.ActivationRecord) error
+	// LookupJustification returns a map of composite key → justification.
+	LookupJustification() map[string]string
+}
+
+// Compile-time check: *Store satisfies StateStore.
+var _ StateStore = (*Store)(nil)
+
 // Store manages loading, pruning, and saving activation records.
 type Store struct {
 	Path   string      // e.g. ~/.pim/activations.json
