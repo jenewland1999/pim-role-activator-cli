@@ -201,6 +201,16 @@ Shows usage information:
 pim --help
 ```
 
+#### `--debug-timings`
+
+Emits structured timing logs for performance diagnosis of key command stages
+(for example: auth, eligible-role fetch, active-role refresh, activation submit).
+
+```bash
+pim --debug-timings
+pim activate --debug-timings
+```
+
 ---
 
 ## Caching

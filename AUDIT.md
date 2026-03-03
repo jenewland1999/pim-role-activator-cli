@@ -24,38 +24,38 @@ or high-severity issues remain.
 
 All 30 items from the 2026-02-26 audit have been addressed:
 
-| # | Original Finding | Resolution | PRD Item |
-|---|------------------|------------|----------|
-| 1 | No tests | 79 tests across 5 packages; CI runs `go test -race` | 3.1–3.6 |
-| 2 | `os.Getenv("HOME")` | Replaced with `os.UserHomeDir()` | 1.1 |
-| 3 | JWT no signature verification | Using `golang-jwt/jwt/v5` `ParseUnverified`; trust boundary documented | 1.3 |
-| 4 | World-readable file permissions | All files `0o600`, directories `0o700` | 1.2 |
-| 5 | No context timeouts | `context.WithTimeout` + `--timeout` flag (default 2m) | 2.1 |
-| 6 | `http.DefaultClient` no timeout | Local `http.Client{Timeout: 30s}` | 2.2 |
-| 7 | Unbounded response body | `io.LimitReader` 10 MiB cap | 2.3 |
-| 8 | Loop variable capture (Go 1.22+) | Removed redundant rebinding | 4.4 |
-| 9 | Panic on empty subscriptions | Guard clause + `config.Validate()` | 1.4, 5.4 |
-| 10 | No `version` variable | `var version = "dev"` + `--version` flag + `pim version` | 6.1, 6.2 |
-| 11 | Dead `formatDuration` | Removed | 4.1 |
-| 12 | Duplicate `truncate` | Unified to rune-based `tui.Truncate()` | 4.2 |
-| 13 | Non-atomic cache writes | `atomicWriteFile` (temp + rename) | 5.1 |
-| 14 | Silent state corruption | `slog.Warn` on corrupt JSON | 5.2 |
-| 15 | No justification validation | `validateJustification`: non-empty, ≤500 runes, no control chars | 5.3 |
-| 16 | No `go vet`/tests in CI | CI has lint, vet, test (race), and multi-platform build jobs | 3.6 |
-| 17 | JSON tag casing | Consistent `snake_case` throughout; no change needed | — |
-| 18 | No signal handling | `signal.NotifyContext` for SIGINT/SIGTERM; exit 130 | 7.1 |
-| 19 | errgroup misuse | `ActivateRoles` now uses `sync.WaitGroup`; errgroup used correctly in parallel subscription fetch | 4.5, 7.2 |
-| 20 | Sequential subscription fetches | Parallelised via `errgroup` + `sync.Mutex` | 7.2 |
-| 21 | Unused `APIVersion` constant | Removed | 4.3 |
-| 22 | No `--version` flag | `--version` flag + `pim version` subcommand | 6.1, 6.2 |
-| 23 | No `.gitignore` | Comprehensive `.gitignore` added | 1.5 |
-| 24 | Binary in repo | Removed; `.gitignore` prevents reoccurrence | 1.5 |
-| 25 | No error wrapping | `fmt.Errorf` with `%w` throughout config, state, cache | 4.6 |
-| 26 | No structured logging | `log/slog` used for all warnings/errors | 6.3 |
-| 27 | Minimal config validation | `Validate()` checks `principal_id` + `subscriptions`; called by `Load()` | 5.4 |
-| 28 | No dependency injection | `Authenticator`, `RoleFetcher`, `RoleActivator`, `StateStore` interfaces | 8.1 |
-| 29 | Regex compiled every call | Cached via `sync.Once` in `ParsedScopePattern()` | 7.4 |
-| 30 | Hardcoded duration options | Configurable via `config.json` `durations` field | 7.3 |
+| #   | Original Finding                 | Resolution                                                                                        | PRD Item |
+| --- | -------------------------------- | ------------------------------------------------------------------------------------------------- | -------- |
+| 1   | No tests                         | 79 tests across 5 packages; CI runs `go test -race`                                               | 3.1–3.6  |
+| 2   | `os.Getenv("HOME")`              | Replaced with `os.UserHomeDir()`                                                                  | 1.1      |
+| 3   | JWT no signature verification    | Using `golang-jwt/jwt/v5` `ParseUnverified`; trust boundary documented                            | 1.3      |
+| 4   | World-readable file permissions  | All files `0o600`, directories `0o700`                                                            | 1.2      |
+| 5   | No context timeouts              | `context.WithTimeout` + `--timeout` flag (default 2m)                                             | 2.1      |
+| 6   | `http.DefaultClient` no timeout  | Local `http.Client{Timeout: 30s}`                                                                 | 2.2      |
+| 7   | Unbounded response body          | `io.LimitReader` 10 MiB cap                                                                       | 2.3      |
+| 8   | Loop variable capture (Go 1.22+) | Removed redundant rebinding                                                                       | 4.4      |
+| 9   | Panic on empty subscriptions     | Guard clause + `config.Validate()`                                                                | 1.4, 5.4 |
+| 10  | No `version` variable            | `var version = "dev"` + `--version` flag + `pim version`                                          | 6.1, 6.2 |
+| 11  | Dead `formatDuration`            | Removed                                                                                           | 4.1      |
+| 12  | Duplicate `truncate`             | Unified to rune-based `tui.Truncate()`                                                            | 4.2      |
+| 13  | Non-atomic cache writes          | `atomicWriteFile` (temp + rename)                                                                 | 5.1      |
+| 14  | Silent state corruption          | `slog.Warn` on corrupt JSON                                                                       | 5.2      |
+| 15  | No justification validation      | `validateJustification`: non-empty, ≤500 runes, no control chars                                  | 5.3      |
+| 16  | No `go vet`/tests in CI          | CI has lint, vet, test (race), and multi-platform build jobs                                      | 3.6      |
+| 17  | JSON tag casing                  | Consistent `snake_case` throughout; no change needed                                              | —        |
+| 18  | No signal handling               | `signal.NotifyContext` for SIGINT/SIGTERM; exit 130                                               | 7.1      |
+| 19  | errgroup misuse                  | `ActivateRoles` now uses `sync.WaitGroup`; errgroup used correctly in parallel subscription fetch | 4.5, 7.2 |
+| 20  | Sequential subscription fetches  | Parallelised via `errgroup` + `sync.Mutex`                                                        | 7.2      |
+| 21  | Unused `APIVersion` constant     | Removed                                                                                           | 4.3      |
+| 22  | No `--version` flag              | `--version` flag + `pim version` subcommand                                                       | 6.1, 6.2 |
+| 23  | No `.gitignore`                  | Comprehensive `.gitignore` added                                                                  | 1.5      |
+| 24  | Binary in repo                   | Removed; `.gitignore` prevents reoccurrence                                                       | 1.5      |
+| 25  | No error wrapping                | `fmt.Errorf` with `%w` throughout config, state, cache                                            | 4.6      |
+| 26  | No structured logging            | `log/slog` used for all warnings/errors                                                           | 6.3      |
+| 27  | Minimal config validation        | `Validate()` checks `principal_id` + `subscriptions`; called by `Load()`                          | 5.4      |
+| 28  | No dependency injection          | `Authenticator`, `RoleFetcher`, `RoleActivator`, `StateStore` interfaces                          | 8.1      |
+| 29  | Regex compiled every call        | Cached via `sync.Once` in `ParsedScopePattern()`                                                  | 7.4      |
+| 30  | Hardcoded duration options       | Configurable via `config.json` `durations` field                                                  | 7.3      |
 
 ---
 
@@ -73,16 +73,16 @@ All 30 items from the 2026-02-26 audit have been addressed:
 
 ### Metrics
 
-| Metric | Value |
-|--------|-------|
-| Go version | 1.25.0 |
-| Direct dependencies | 10 |
-| Source files (`.go`, excl. tests) | 16 |
-| Test files | 5 |
-| Unit tests | 79 |
-| Packages | 8 (`main` + 7 internal) |
-| Lines of Go (approx.) | ~2,600 |
-| CI jobs | 4 (lint, test, build×5, release) |
+| Metric                            | Value                            |
+| --------------------------------- | -------------------------------- |
+| Go version                        | 1.25.0                           |
+| Direct dependencies               | 10                               |
+| Source files (`.go`, excl. tests) | 16                               |
+| Test files                        | 5                                |
+| Unit tests                        | 79                               |
+| Packages                          | 8 (`main` + 7 internal)          |
+| Lines of Go (approx.)             | ~2,600                           |
+| CI jobs                           | 4 (lint, test, build×5, release) |
 
 ---
 
@@ -113,6 +113,7 @@ All 30 items from the 2026-02-26 audit have been addressed:
 #### 6. No tests for `setup`, `tui`, or `azure` (non-identity) packages
 
 Tests exist for `model`, `cache`, `config`, `state`, and `azure/identity`. The following remain untested:
+
 - `internal/setup/setup.go` — interactive wizard (would need mocked `huh` form inputs)
 - `internal/tui/*.go` — bubbletea models (would need `teatest` or similar)
 - `internal/azure/activate.go`, `active.go`, `eligible.go`, `subscriptions.go` — ARM API calls (would need mock ARM clients or HTTP record/replay)
@@ -163,13 +164,13 @@ The user guide docs exist but don't reference `docs/config.schema.json`. Adding 
 
 ## Summary
 
-| Severity | Count | Themes |
-|----------|-------|--------|
-| **Critical** | 0 | — |
-| **High** | 0 | — |
-| **Medium** | 0 | — |
-| **Low** | 8 | Dead code (2), unused exports (1), non-atomic writes (2), missing tests (1), tooling (2) |
-| **Informational** | 7 | Shared utilities, integration tests, release verification, docs |
+| Severity          | Count | Themes                                                                                   |
+| ----------------- | ----- | ---------------------------------------------------------------------------------------- |
+| **Critical**      | 0     | —                                                                                        |
+| **High**          | 0     | —                                                                                        |
+| **Medium**        | 0     | —                                                                                        |
+| **Low**           | 8     | Dead code (2), unused exports (1), non-atomic writes (2), missing tests (1), tooling (2) |
+| **Informational** | 7     | Shared utilities, integration tests, release verification, docs                          |
 
 The codebase is in good shape. All critical, high, and medium issues from the original audit have been resolved. The remaining items are low-severity cleanup tasks and future improvement opportunities. The most impactful next steps would be:
 

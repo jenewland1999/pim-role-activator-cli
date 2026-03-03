@@ -52,6 +52,7 @@ Detailed installation guides for each platform:
 
 ```text
 pim                 Show currently active PIM roles
+pim status          Show currently active PIM roles
 pim activate        Activate eligible PIM roles interactively
 pim setup           Re-run the configuration wizard
 pim version         Print version, Go runtime, and platform
@@ -61,6 +62,7 @@ Flags:
   --dry-run       Walk through prompts without activating
   --no-cache      Bypass the 24-hour eligible role cache
   --timeout       Timeout for Azure API calls (e.g. 30s, 2m, 5m)
+  --debug-timings Emit debug timing logs for command stages
   -h, --help      Show help
 ```
 
@@ -194,6 +196,7 @@ To run the CLI directly from source without installing a binary:
 go run ./cmd/pim
 
 # Run a specific subcommand
+go run ./cmd/pim status
 go run ./cmd/pim activate
 go run ./cmd/pim setup
 go run ./cmd/pim activate --dry-run --no-cache
