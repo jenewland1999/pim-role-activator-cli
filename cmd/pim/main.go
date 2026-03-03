@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode"
@@ -19,6 +20,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/jenewland1999/pim-role-activator-cli/internal/azure"
 	"github.com/jenewland1999/pim-role-activator-cli/internal/cache"
@@ -135,18 +137,25 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 
 	var allRoles []model.ActiveRole
 	if err := tui.RunWithSpinner(spinnerMsg, func() error {
+		g, gctx := errgroup.WithContext(ctx)
+		var mu sync.Mutex
 		for _, sub := range cfg.Subscriptions {
-			clients, e := azure.NewClients(sub.ID, cred)
-			if e != nil {
-				return e
-			}
-			roles, e := azure.FetchActiveRoles(ctx, clients.Active, "/subscriptions/"+sub.ID, sub.Name, justMap, re, cfg.EnvLabels)
-			if e != nil {
-				return e
-			}
-			allRoles = append(allRoles, roles...)
+			g.Go(func() error {
+				clients, e := azure.NewClients(sub.ID, cred)
+				if e != nil {
+					return e
+				}
+				roles, e := azure.FetchActiveRoles(gctx, clients.Active, "/subscriptions/"+sub.ID, sub.Name, justMap, re, cfg.EnvLabels)
+				if e != nil {
+					return e
+				}
+				mu.Lock()
+				allRoles = append(allRoles, roles...)
+				mu.Unlock()
+				return nil
+			})
 		}
-		return nil
+		return g.Wait()
 	}); err != nil {
 		if cacheHit {
 			// We already showed cached results — warn but don't fail hard.
@@ -265,18 +274,25 @@ func runActivate(cmd *cobra.Command, _ []string) error {
 
 	if eligibleRoles == nil {
 		if err := tui.RunWithSpinner("Fetching eligible PIM roles…", func() error {
+			g, gctx := errgroup.WithContext(ctx)
+			var mu sync.Mutex
 			for _, sub := range cfg.Subscriptions {
-				clients, e := azure.NewClients(sub.ID, cred)
-				if e != nil {
-					return e
-				}
-				roles, e := azure.FetchEligibleRoles(ctx, clients.Eligible, "/subscriptions/"+sub.ID, sub.Name, re, cfg.EnvLabels)
-				if e != nil {
-					return e
-				}
-				eligibleRoles = append(eligibleRoles, roles...)
+				g.Go(func() error {
+					clients, e := azure.NewClients(sub.ID, cred)
+					if e != nil {
+						return e
+					}
+					roles, e := azure.FetchEligibleRoles(gctx, clients.Eligible, "/subscriptions/"+sub.ID, sub.Name, re, cfg.EnvLabels)
+					if e != nil {
+						return e
+					}
+					mu.Lock()
+					eligibleRoles = append(eligibleRoles, roles...)
+					mu.Unlock()
+					return nil
+				})
 			}
-			return nil
+			return g.Wait()
 		}); err != nil {
 			return fmt.Errorf("%s Failed to fetch eligible roles: %w", tui.Cross, err)
 		}
