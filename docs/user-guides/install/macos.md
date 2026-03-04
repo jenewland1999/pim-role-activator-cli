@@ -71,7 +71,7 @@ sudo mv pim /usr/local/bin/pim
 pim --help
 ```
 
-## First-Time Setup
+## Setup
 
 1. Log in to Azure:
 
@@ -80,6 +80,22 @@ pim --help
    ```
 
 2. Run `pim` — the setup wizard will launch automatically on first run and configure your subscriptions and identity.
+
+## Usage
+
+```bash
+# Show active roles
+pim
+
+# Activate roles interactively
+pim activate
+
+# Dry run activation flow
+pim activate --dry-run
+
+# Re-run setup manually
+pim setup
+```
 
 ## Uninstall
 

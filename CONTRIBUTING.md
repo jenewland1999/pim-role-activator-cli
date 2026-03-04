@@ -39,9 +39,11 @@ Thanks for your interest in contributing to PIM Role Activator CLI.
    gofmt -w .
    ```
 
-4. Ensure the project builds:
+4. Ensure the project builds and passes checks:
 
    ```bash
+   go vet ./...
+   go test -race -count=1 ./...
    go build ./...
    ```
 
@@ -84,6 +86,18 @@ Add `BREAKING CHANGE:` in the commit body (or `!` after the type) for breaking c
 - Follow standard Go conventions and idioms
 - Keep functions focused and well-named
 - Add comments for exported types and functions
+
+## CI Expectations
+
+CI runs on every push/PR to `main` and includes:
+
+- Formatting + lint checks
+- `go vet`
+- Test execution with race detection
+- Coverage generation and test result artifact upload
+- Cross-platform build verification
+
+See [docs/ci-cd.md](docs/ci-cd.md) for full pipeline details.
 
 ## Reporting Issues
 

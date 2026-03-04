@@ -14,8 +14,8 @@
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
 # Go (check https://go.dev/dl/ for the latest version)
-wget https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz
+wget https://go.dev/dl/go1.25.0.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.25.0.linux-amd64.tar.gz
 export PATH="$PATH:/usr/local/go/bin"
 ```
 
@@ -79,7 +79,7 @@ sudo mv pim /usr/local/bin/pim
 pim --help
 ```
 
-## First-Time Setup
+## Setup
 
 1. Log in to Azure:
 
@@ -94,6 +94,22 @@ pim --help
    ```
 
 2. Run `pim` — the setup wizard will launch automatically on first run and configure your subscriptions and identity.
+
+## Usage
+
+```bash
+# Show active roles
+pim
+
+# Activate roles interactively
+pim activate
+
+# Dry run activation flow
+pim activate --dry-run
+
+# Re-run setup manually
+pim setup
+```
 
 ## Uninstall
 

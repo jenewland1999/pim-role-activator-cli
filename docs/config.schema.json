@@ -48,7 +48,7 @@
         "type": "string",
         "minLength": 1
       },
-      "examples": [["APP2", "APP4", "APP5"]]
+      "examples": [["APP1", "APP2", "APP3"]]
     },
     "cache_ttl_hours": {
       "type": "integer",

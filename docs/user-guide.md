@@ -70,8 +70,8 @@ Running `pim` with no arguments shows a table of currently active PIM roles:
   App  │ Env  │ Scope              │ Role                     │ Expires In │ Justification    │ Subscription
   ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
   APP1 │ Prod │ RG-PRD-APP1-001    │ Contributor              │ 45m        │ Deploy hotfix    │ Shared Services
-  APP2 │ Prod │ RG-PRD-APP2-001    │ Contributor              │ 1h 20m     │ Deploy hotfix    │ Pet Platform
-  APP3 │ Prod │ RG-PRD-APP3-001    │ Reader                   │ 3h 55m     │ Investigating i… │ Corporate Core
+  APP2 │ Prod │ RG-PRD-APP2-001    │ Contributor              │ 1h 20m     │ Deploy hotfix    │ Platform Services
+  APP3 │ Prod │ RG-PRD-APP3-001    │ Reader                   │ 3h 55m     │ Investigating i… │ Shared Platform
 
   Run pim activate to activate more roles.
 ```
@@ -106,7 +106,7 @@ keyboard:
 | `Space`     | Toggle selection on the highlighted role                                               |
 | `a`         | Select **all** visible roles                                                           |
 | `n`         | Deselect **all** visible roles                                                         |
-| `g`         | **Group select** — auto-selects roles with APP2, APP4, APP5, or APP3 in the scope name |
+| `g`         | **Group select** — auto-selects roles matching configured quick-select patterns |
 | `/`         | Enter **search mode** — type to filter roles by name or scope                          |
 | `Backspace` | Clear the current search filter                                                        |
 | `Enter`     | **Confirm** selection (need at least 1 selected)                                       |
@@ -153,7 +153,7 @@ A summary is shown before any API calls are made:
 ─── Summary ────────────────────────────────────────────────────────────
   Roles:
     ▸ APP1  Prod  RG-PRD-APP1-001    Contributor              Shared Services
-    ▸ APP2  Prod  RG-PRD-APP2-001    Contributor              Pet Platform
+    ▸ APP2  Prod  RG-PRD-APP2-001    Contributor              Platform Services
   Justification: Deploying hotfix for critical bug
   Duration:      1 hour
 ────────────────────────────────────────────────────────────────────────

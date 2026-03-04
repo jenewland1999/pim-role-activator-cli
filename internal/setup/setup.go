@@ -171,7 +171,7 @@ func Run(dir string, suggestedPrincipalID string, availableSubs []AvailableSubsc
 			huh.NewInput().
 				Title("Group-select patterns (optional)").
 				Description("Comma-separated substrings. Pressing 'g' in the role selector will\nselect all roles whose scope name contains any of these strings.\nLeave blank to skip.").
-				Placeholder("e.g. APP2,APP4,APP5").
+				Placeholder("e.g. APP1,APP2,APP3").
 				Value(&rawPatterns),
 		),
 	)

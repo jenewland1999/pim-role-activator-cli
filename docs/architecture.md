@@ -1,250 +1,143 @@
 # Architecture
 
-> Describes the system's structure, control flow, data flow, and component
-> responsibilities for the Go implementation.
-
 ## Overview
 
-PIM Role Activator CLI is a compiled Go binary (`pim`) that provides two
-modes of operation:
+PIM Role Activator CLI is a Go command-line application that provides two main execution paths:
 
-| Mode         | Command        | Purpose                                         |
-| ------------ | -------------- | ----------------------------------------------- |
-| **Status**   | `pim`          | Display currently active PIM role assignments   |
-| **Activate** | `pim activate` | Interactive workflow to activate eligible roles |
+- `pim` / `pim status` for active-assignment visibility
+- `pim activate` for interactive eligible-role activation
 
-The CLI uses the **Azure SDK for Go** to communicate with the Azure Resource
-Manager REST API, and stores local cache/state in `~/.pim/`.
+The runtime combines:
+
+- Azure SDK clients for ARM control-plane calls
+- Terminal-first UX components (Bubble Tea, Huh, Lip Gloss)
+- Local config/cache/state files under `~/.pim/`
+
+## Core Dependencies
+
+| Dependency                                                                                | Purpose                                     |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `github.com/Azure/azure-sdk-for-go/sdk/azidentity`                                        | Authentication via `DefaultAzureCredential` |
+| `github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2` | PIM/authorization ARM APIs                  |
+| `github.com/spf13/cobra`                                                                  | Command/flag routing                        |
+| `github.com/charmbracelet/bubbletea`                                                      | Interactive role selector + duration picker |
+| `github.com/charmbracelet/huh`                                                            | Setup and input forms                       |
+| `github.com/charmbracelet/lipgloss`                                                       | Terminal styling                            |
+| `github.com/google/uuid`                                                                  | Activation request IDs                      |
+
+## Key Technologies and Prerequisites
+
+- Go 1.25+
+- Azure CLI installed and logged in (`az login`)
+- Access to Azure subscriptions with eligible PIM assignments
+- Platform support: macOS, Linux, Windows
+
+## External Services Integrated
+
+- Azure Resource Manager (`management.azure.com`) endpoints for:
+  - `RoleEligibilityScheduleInstances`
+  - `RoleAssignmentScheduleInstances`
+  - `RoleAssignmentScheduleRequests`
+- GitHub Actions for linting, tests, builds, docs checks, releases
 
 ## Project Structure
 
 ```text
 pim-role-activator-cli/
-├── cmd/
-│   └── pim/
-│       └── main.go              # Entry point, cobra commands, top-level glue
+├── cmd/pim/main.go
 ├── internal/
-│   ├── azure/
-│   │   ├── client.go            # Azure SDK client setup + DefaultAzureCredential
-│   │   ├── eligible.go          # Fetch eligible PIM roles (asTarget() filter)
-│   │   ├── active.go            # Fetch active role assignments (Activated filter)
-│   │   └── activate.go          # Self-activate a role (SelfActivate PUT)
-│   ├── cache/
-│   │   └── cache.go             # File-based eligible-role cache with 24h TTL
-│   ├── config/
-│   │   └── config.go            # Constants: subscription ID, principal ID, scope
-│   ├── model/
-│   │   ├── role.go              # Role, ActiveRole, DurationOption types
-│   │   ├── activation.go        # ActivationRecord + ActivationResult types
-│   │   └── rgname.go            # DecodeEnv() + DecodeAppCode() from RG name
-│   ├── state/
-│   │   └── state.go             # activations.json read/write/prune
-│   └── tui/
-│       ├── selector.go          # Bubbletea role selector with row render cache
-│       ├── duration.go          # Bubbletea duration picker
-│       ├── loader.go            # Spinner wrapper for blocking API calls
-│       ├── status.go            # Status table + summary + results display
-│       └── styles.go            # Lipgloss style definitions + helper funcs
+│   ├── azure/      # ARM client setup, eligible/active fetch, activation
+│   ├── cache/      # eligible + active role cache implementations
+│   ├── config/     # persisted user configuration and validation
+│   ├── model/      # shared data types
+│   ├── setup/      # interactive first-run/setup wizard
+│   ├── state/      # activation history persistence
+│   └── tui/        # selector, duration picker, status/results rendering
 ├── docs/
-├── go.mod
-└── go.sum
+└── .github/workflows/
 ```
 
-## System Diagram
+## Runtime Component Diagram
 
-```text
-┌──────────────────────────────────────────────────────────┐
-│                     User Terminal                        │
-│                                                          │
-│  pim              → Status Mode (read-only)              │
-│  pim activate     → Activate Mode (interactive + write)  │
-│  pim activate --dry-run  → Activate Mode (no API calls)  │
-│  pim activate --no-cache → Activate Mode (skip cache)    │
-└──────────────┬───────────────────────────────────────────┘
-               │
-               ▼
-┌──────────────────────────────────────────────────────────┐
-│                  pim (Go binary)                         │
-│                                                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│  │ cobra        │  │ azidentity   │  │ model/       │   │
-│  │ rootCmd      │  │ DefaultAzure │  │ rgname.go    │   │
-│  │ activateCmd  │  │ Credential   │  │ Env + App    │   │
-│  │ --dry-run    │  │              │  │ Code decoder │   │
-│  │ --no-cache   │  │              │  │              │   │
-│  └──────┬───────┘  └──────┬───────┘  └──────────────┘   │
-│         │                 │                              │
-│         ▼                 ▼                              │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │              Mode Router (cobra)                    │ │
-│  │  rootCmd.RunE  → Status Flow                        │ │
-│  │  activateCmd.RunE → Activate Flow                   │ │
-│  └──────────┬──────────────────────┬───────────────────┘ │
-│             │                      │                     │
-│    ┌────────▼────────┐    ┌────────▼────────┐            │
-│    │  Status Mode    │    │  Activate Mode  │            │
-│    │                 │    │                 │            │
-│    │  azure/active   │    │  1. cache/get   │            │
-│    │  .FetchActive   │    │     or azure/   │            │
-│    │  Roles()        │    │     eligible    │            │
-│    │  tui.PrintStatus│    │  2. tui/select  │            │
-│    │                 │    │  3. huh justify │            │
-│    └────────┬────────┘    │  4. tui/duration│            │
-│             │             │  5. tui/summary │            │
-│             │             │  6. azure/activ │            │
-│             │             │     ate (parallel)│          │
-│             │             │  7. state/save  │            │
-│             │             └────────┬────────┘            │
-└─────────────┼──────────────────────┼─────────────────────┘
-              │                      │
-              ▼                      ▼
-┌─────────────────────┐  ┌───────────────────────┐
-│  Azure ARM REST API │  │  Local Storage        │
-│  (management.azure  │  │  (~/.pim/)            │
-│  .com) via SDK      │  │                       │
-│                     │  │  eligible-roles-data.json │
-│  • roleEligibility  │  │  eligible-roles-meta.json │
-│    ScheduleInstances│  │  activations.json     │
-│  • roleAssignment   │  │                       │
-│    ScheduleInstances│  └───────────────────────┘
-│  • roleAssignment   │
-│    ScheduleRequests │
-└─────────────────────┘
+```mermaid
+flowchart LR
+    User[User Terminal] --> CLI[pim CLI]
+
+    subgraph CLIBox[Go CLI Runtime]
+        CLI --> Cobra[Cobra Commands]
+        CLI --> TUI[TUI + Forms]
+        CLI --> Config[Config Loader]
+        CLI --> Cache[Cache Layer]
+        CLI --> State[State Store]
+        CLI --> Azure[Azure Service Layer]
+    end
+
+    Azure --> ARM[Azure ARM APIs]
+    Config --> Disk[(~/.pim/config.json)]
+    Cache --> Disk
+    State --> Disk
 ```
 
-## Control Flow
+## Command Flow
 
-### Status Mode (`pim`)
+```mermaid
+flowchart TD
+    Start([pim invocation]) --> Exists{Config exists?}
+    Exists -- no --> Setup[Run setup wizard]
+    Exists -- yes --> Route{Command}
+    Setup --> Route
 
-```text
-1. cobra rootCmd.RunE → runStatus()
-2. azidentity.DefaultAzureCredential — reads ~/.azure/ from az login
-3. azure.FetchActiveRoles() — GET roleAssignmentScheduleInstances?$filter=asTarget()
-   └─ filters: assignmentType == "Activated"
-4. state.LookupJustification() — reads ~/.pim/activations.json
-5. For each active assignment:
-   a. Extract role name, scope, type from expandedProperties (typed SDK structs)
-   b. DecodeEnv() + DecodeAppCode() from RG name (case-insensitive)
-   c. time.Until(endDateTime) → remaining duration
-   d. justification lookup by composite key (scope + "|" + roleDefinitionId)
-6. tui.PrintStatus() — renders table to stdout
-7. Exit
+    Route -->|status/default| StatusAuth[Authenticate]
+    StatusAuth --> StatusCache[Load active-role cache]
+    StatusCache --> StatusFetch[Fetch active roles across subscriptions]
+    StatusFetch --> StatusRender[Render status output]
+
+    Route -->|activate| ActAuth[Authenticate]
+    ActAuth --> EligCache{Eligible cache hit?}
+    EligCache -- yes --> Select[Interactive role selector]
+    EligCache -- no --> EligFetch[Fetch eligible roles]
+    EligFetch --> Select
+    Select --> Justify[Justification input]
+    Justify --> Duration[Duration picker]
+    Duration --> Confirm{Confirm?}
+    Confirm -- no --> Exit([Exit])
+    Confirm -- yes --> Activate[Parallel activation requests]
+    Activate --> Persist[Append activation history]
+    Persist --> Results[Render results]
 ```
 
-### Activate Mode (`pim activate`)
+## Status Mode (`pim` / `pim status`)
 
-```text
-1. cobra activateCmd.RunE → runActivate()
-2. azidentity.DefaultAzureCredential
-3. cache.Get():
-   a. If hit → json.Unmarshal into []model.Role
-   b. If miss → azure.FetchEligibleRoles() then cache.Set()
-4. tui.RunSelector() — bubbletea alt-screen TUI
-   a. Pre-renders all 4 row states into rowRender cache at startup
-   b. Handles ↑/↓ (cursor only), Space (toggle + single cache rebuild),
-      a/n/g (bulk toggle + full cache rebuild), / (search + rebuildVisible)
-   c. Returns selected []model.Role or cancelled
-5. huh.NewForm() — justification text input with validation
-6. tui.RunDurationSelector() — bubbletea duration picker
-7. tui.PrintSummary()
-8. If --dry-run → exit
-9. huh confirm prompt (y/N)
-10. azure.ActivateRoles() — parallel with sync.WaitGroup
-    a. uuid.New() for each request ID
-    b. PUT roleAssignmentScheduleRequests/{uuid}
-11. state.Save() — prune expired + append new entries → activations.json
-12. tui.PrintResults()
-```
+1. Build context with timeout from `--timeout`
+2. Authenticate with `DefaultAzureCredential`
+3. Optionally show cached active roles immediately
+4. Fetch active assignments across configured subscriptions concurrently
+5. Join API data with local justification history (`activations.json`)
+6. Persist refreshed active-role cache with dynamic TTL
+7. Render table (or empty-state) output
 
-## Component Inventory
+## Activate Mode (`pim activate`)
 
-- `cmd/pim` (`main.go`) — cobra wiring, flag definitions, top-level orchestration
-- `internal/azure` (`client.go`) — Azure SDK client factory, DefaultAzureCredential
-- `internal/azure` (`eligible.go`) — fetch eligible roles, map to `model.Role`, decode RG name
-- `internal/azure` (`active.go`) — fetch active assignments, map to `model.ActiveRole`
-- `internal/azure` (`activate.go`) — SelfActivate PUT, parallel via `sync.WaitGroup`
-- `internal/cache` (`cache.go`) — file-based TTL cache (`prefix-data.json` + `prefix-meta.json`)
-- `internal/config` (`config.go`) — principal/subscription configuration, validation, cache TTL
-- `internal/model` (`role.go`) — `Role`, `ActiveRole`, `DurationOption`, `ActivationResult`
-- `internal/model` (`activation.go`) — `ActivationRecord`
-- `internal/model` (`rgname.go`) — scope decoding via regexp capture groups
-- `internal/state` (`state.go`) — `activations.json` read, prune, append, write
-- `internal/tui` (`selector.go`) — Bubbletea role selector with pre-render cache
-- `internal/tui` (`duration.go`) — Bubbletea duration picker
-- `internal/tui` (`loader.go`) — spinner wrapper for blocking API calls
-- `internal/tui` (`status.go`) — status, summary, and results rendering
-- `internal/tui` (`styles.go`) — Lipgloss styles and rendering helpers
+1. Build context with timeout from `--timeout`
+2. Authenticate with `DefaultAzureCredential`
+3. Load eligible-role cache (unless `--no-cache`) or fetch from ARM
+4. Run role selector TUI
+5. Collect justification and duration
+6. Print summary; prompt `Proceed with activation? (y/N)`
+7. Submit `SelfActivate` requests using bounded worker concurrency
+8. Append successful activations to local state
+9. Render activation results
 
-## Data Flow
+## Data Ownership
 
-```text
-Eligible Roles API Response
-    │
-    ├─ json.Marshal → ~/.pim/eligible-roles-data.json (configurable TTL)
-    │
-    ▼
-[]model.Role (typed Go structs)
-    │
-    ├─ RoleName, ScopeName  → TUI display + search
-    ├─ Environment, AppCode → Decoded from ScopeName (DecodeEnv/DecodeAppCode)
-    ├─ RoleDefinitionID     → API activation request body
-    └─ Scope                → API activation request URL
+- `config.json`: user configuration and preferences
+- `eligible-roles-*.json`: cached eligible-role dataset and metadata
+- `active-roles-*.json`: cached active-role dataset and metadata
+- `activations.json`: local successful activation history for justification lookup
 
-User Selections ([]model.Role where Selected == true)
-    │
-    ├─ + justification (string)
-    ├─ + model.DurationOption{ISO8601, Duration, Label}
-    │
-    ▼
-Parallel azure.ActivateRoles() (sync.WaitGroup)
-    │
-    ▼
-[]model.ActivationResult → tui.PrintResults()
-    │
-    ▼
-[]model.ActivationRecord → ~/.pim/activations.json
-```
+## Design Notes
 
-## Terminal UI Architecture
-
-The interactive selector is built on [bubbletea](https://github.com/charmbracelet/bubbletea)
-and [lipgloss](https://github.com/charmbracelet/lipgloss):
-
-| Technique             | Purpose                                          |
-| --------------------- | ------------------------------------------------ |
-| `tea.WithAltScreen()` | Full-screen mode, restored automatically on exit |
-| `tea.KeyMsg`          | Keystroke handling (↑/↓/space/a/n/g/c/enter//)   |
-| `tea.WindowSizeMsg`   | Terminal resize → viewport recalculation         |
-| `lipgloss.Reverse()`  | Highlight cursor row uniformly                   |
-| `lipgloss.Faint()`    | Dim unselected rows                              |
-| `lipgloss.Green()`    | Selected (non-cursor) rows                       |
-| `bubbles/textinput`   | Search input with `Blink` command                |
-
-### Rendering Strategy — Row Render Cache
-
-Because `View()` is called on every keypress, all lipgloss rendering is done
-**once at startup** and stored in a `rowRender` cache (one entry per role,
-four pre-built strings per entry):
-
-| Field         | When used                             |
-| ------------- | ------------------------------------- |
-| `normalUnsel` | Cursor elsewhere, role not selected   |
-| `normalSel`   | Cursor elsewhere, role selected       |
-| `cursorUnsel` | Cursor on this row, role not selected |
-| `cursorSel`   | Cursor on this row, role selected     |
-
-`View()` for navigation (↑/↓) is a pure integer increment + slice lookups.
-Only selection changes (`Space`, `a`, `n`, `g`) trigger cache rebuilds
-(single entry or full rebuild respectively).
-
-## Error Handling
-
-| Scenario                  | Behaviour                                  |
-| ------------------------- | ------------------------------------------ |
-| Not authenticated         | SDK returns error → "run az login" message |
-| API call fails            | Wrapped error returned to cobra → exit 1   |
-| No eligible roles         | Info message + exit 0                      |
-| No active roles (status)  | Info message + exit 0                      |
-| Empty justification       | huh validation rejects empty input         |
-| Activation fails (1 role) | Per-role error logged, remaining continue  |
-| User cancels TUI          | cancelled = true → "Cancelled." + exit 0   |
+- Uses context cancellation for Ctrl+C / SIGTERM handling
+- Separates domain models from transport/client code
+- Uses structured logging for warnings/errors and optional timing diagnostics
+- Keeps terminal output concise while preserving subscription visibility
