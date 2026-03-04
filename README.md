@@ -54,6 +54,7 @@ Detailed installation guides for each platform:
 pim                 Show currently active PIM roles
 pim status          Show currently active PIM roles
 pim activate        Activate eligible PIM roles interactively
+pim completion      Generate shell completion scripts
 pim setup           Re-run the configuration wizard
 pim version         Print version, Go runtime, and platform
 pim activate [flags]
