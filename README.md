@@ -174,7 +174,6 @@ All local data lives in `~/.pim/`:
 
 - [Architecture](docs/architecture.md) — system design, control flow, component inventory
 - [Data Formats](docs/data-formats.md) — cache file schemas, RG naming convention, activation payloads
-- [Active Roles Cache](docs/active-roles-cache.md) — status cache design and refresh behavior
 - [User Guide](docs/user-guide.md) — commands, key bindings, troubleshooting
 
 ## Troubleshooting
