@@ -48,7 +48,21 @@ jobs:
         run: go vet ./...
 
       - name: Run tests
-        run: go test -race -count=1 ./...
+        run: |
+          set -o pipefail
+          go test -race -count=1 -covermode=atomic -coverprofile=coverage.out -json ./... | tee test-results.json
+
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out > coverage.txt
+
+      - name: Upload test and coverage artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-and-coverage
+          path: |
+            coverage.out
+            coverage.txt
+            test-results.json
 
   build:
     name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
