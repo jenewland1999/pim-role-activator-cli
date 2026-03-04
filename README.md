@@ -176,7 +176,6 @@ All local data lives in `~/.pim/`:
 - [Data Formats](docs/data-formats.md) — cache file schemas, RG naming convention, activation payloads
 - [Active Roles Cache](docs/active-roles-cache.md) — status cache design and refresh behavior
 - [User Guide](docs/user-guide.md) — commands, key bindings, troubleshooting
-- [Implementation Notes](docs/go-migration.md) — architecture decisions, dependency choices, type mappings
 
 ## Troubleshooting
 
