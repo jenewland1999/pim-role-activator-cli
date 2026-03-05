@@ -21,10 +21,10 @@ func TestLoad_ValidConfig(t *testing.T) {
 			{ID: "sub-1", Name: "Dev"},
 			{ID: "sub-2", Name: "Prod"},
 		},
-		CacheTTLHours:      12,
-		ScopePattern:       `^.(?P<env>[PQTD])`,
+		CacheTTLHours:       12,
+		ScopePattern:        `^.(?P<env>[PQTD])`,
 		GroupSelectPatterns: []string{"rg-*"},
-		EnvLabels:          map[string]string{"P": "Prod", "D": "Dev"},
+		EnvLabels:           map[string]string{"P": "Prod", "D": "Dev"},
 	}
 	writeConfig(t, dir, cfg)
 

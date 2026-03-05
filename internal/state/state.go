@@ -29,7 +29,7 @@ var _ StateStore = (*Store)(nil)
 
 // Store manages loading, pruning, and saving activation records.
 type Store struct {
-	Path   string      // e.g. ~/.pim/activations.json
+	Path   string       // e.g. ~/.pim/activations.json
 	Logger *slog.Logger // logger for warning messages; defaults to slog.Default()
 }
 

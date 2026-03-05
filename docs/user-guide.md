@@ -119,17 +119,17 @@ Interactive 3-step workflow:
 An interactive list of all eligible PIM roles appears. Navigate with your
 keyboard:
 
-| Key         | Action                                                                                 |
-| ----------- | -------------------------------------------------------------------------------------- |
-| `↑` / `↓`   | Move cursor up/down (wraps around)                                                     |
-| `Space`     | Toggle selection on the highlighted role                                               |
-| `a`         | Select **all** visible roles                                                           |
-| `n`         | Deselect **all** visible roles                                                         |
-| `g`         | **Group select** — auto-selects roles matching configured quick-select patterns |
-| `/`         | Enter **search mode** — type to filter roles by name or scope                          |
-| `Backspace` | Clear the current search filter                                                        |
-| `Enter`     | **Confirm** selection (need at least 1 selected)                                       |
-| `c`         | **Cancel** and exit                                                                    |
+| Key         | Action                                                                          |
+| ----------- | ------------------------------------------------------------------------------- |
+| `↑` / `↓`   | Move cursor up/down (wraps around)                                              |
+| `Space`     | Toggle selection on the highlighted role                                        |
+| `a`         | Select **all** visible roles                                                    |
+| `n`         | Deselect **all** visible roles                                                  |
+| `g`         | **Group select** - auto-selects roles matching configured quick-select patterns |
+| `/`         | Enter **search mode** — type to filter roles by name or scope                   |
+| `Backspace` | Clear the current search filter                                                 |
+| `Enter`     | **Confirm** selection (need at least 1 selected)                                |
+| `c`         | **Cancel** and exit                                                             |
 
 The list scrolls automatically when there are more roles than fit on screen.
 Scroll indicators ("↑ N more above" / "↓ N more below") show when content

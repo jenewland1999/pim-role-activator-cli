@@ -14,10 +14,10 @@ type TokenClaims struct {
 	jwt.RegisteredClaims
 
 	// UPN / login name (present for interactive user sessions)
-	UPN              string `json:"upn"`
-	UniqueName       string `json:"unique_name"`
+	UPN               string `json:"upn"`
+	UniqueName        string `json:"unique_name"`
 	PreferredUsername string `json:"preferred_username"`
-	Name             string `json:"name"`
+	Name              string `json:"name"`
 	// OID is the Entra Object ID — useful as a suggested PrincipalID during setup.
 	OID string `json:"oid"`
 }

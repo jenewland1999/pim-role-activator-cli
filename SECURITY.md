@@ -6,7 +6,7 @@ If you discover a security vulnerability in this project, please report it respo
 
 **Do not open a public GitHub issue.**
 
-Instead, send an email to: **jenewland1999@gmail.com**
+Instead, send an email to: [jenewland1999@gmail.com](mailto:jenewland1999@gmail.com)
 
 Please include:
 

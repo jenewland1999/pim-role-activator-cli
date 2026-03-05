@@ -35,7 +35,7 @@ func printStatusTable(roles []model.ActiveRole, showAppEnv bool, cached bool) {
 	if len(roles) == 0 {
 		fmt.Println()
 		fmt.Println("  " + Dim("No PIM roles are currently active."))
-		fmt.Println("  " + Dim("Run ")+Bold("pim activate")+Dim(" to activate roles."))
+		fmt.Println("  " + Dim("Run ") + Bold("pim activate") + Dim(" to activate roles."))
 		fmt.Println()
 		return
 	}
@@ -84,7 +84,7 @@ func printStatusTable(roles []model.ActiveRole, showAppEnv bool, cached bool) {
 	}
 
 	fmt.Println()
-	fmt.Println("  " + Dim("Run ")+Bold("pim activate")+Dim(" to activate more roles."))
+	fmt.Println("  " + Dim("Run ") + Bold("pim activate") + Dim(" to activate more roles."))
 	fmt.Println()
 }
 

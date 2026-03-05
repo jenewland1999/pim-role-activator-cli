@@ -4,12 +4,12 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	styleBold    = lipgloss.NewStyle().Bold(true)
-	styleDim     = lipgloss.NewStyle().Faint(true)
-	styleCyan    = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
-	styleGreen   = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	styleYellow  = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-	styleRed     = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	styleBold   = lipgloss.NewStyle().Bold(true)
+	styleDim    = lipgloss.NewStyle().Faint(true)
+	styleCyan   = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
+	styleGreen  = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	styleYellow = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	styleRed    = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 
 	styleBoldCyan   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14"))
 	styleBoldYellow = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11"))

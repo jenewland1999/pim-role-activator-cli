@@ -335,8 +335,6 @@ func (m selectorModel) View() string {
 	return sb.String()
 }
 
-
-
 // RunSelector launches the interactive role selector and returns the chosen roles.
 // cancelled is true when the user pressed 'c' or Ctrl+C without confirming.
 // showAppEnv should be true when a scope_pattern is configured in UserConfig.
