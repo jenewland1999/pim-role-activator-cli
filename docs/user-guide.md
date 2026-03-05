@@ -58,7 +58,9 @@ pim
 
 ### `pim` — Show Active Roles
 
-Running `pim` with no arguments shows a table of currently active PIM roles:
+Running `pim` with no arguments shows currently active PIM roles.
+
+When `scope_pattern` is configured, App/Env columns are shown:
 
 ```text
 ╔══════════════════════════════════════╗
@@ -76,10 +78,27 @@ Running `pim` with no arguments shows a table of currently active PIM roles:
   Run pim activate to activate more roles.
 ```
 
+When `scope_pattern` is not configured, output uses a simpler table without App/Env:
+
+```text
+╔══════════════════════════════════════╗
+║     PIM Role Activator CLI           ║
+╚══════════════════════════════════════╝
+
+  ✔ 2 active PIM role(s):
+
+  Scope              │ Role                     │ Expires In │ Justification    │ Subscription
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  RG-PRD-APP1-001    │ Contributor              │ 45m        │ Deploy hotfix    │ Shared Services
+  RG-PRD-APP2-001    │ Reader                   │ 1h 20m     │ Investigating i… │ Platform Services
+
+  Run pim activate to activate more roles.
+```
+
 **Columns:**
 
-- **App** — 4-character application code from characters 8–11 of the RG name
-- **Env** — Environment decoded from the RG name (P=Prod, Q=QA, T=Test, D=Dev)
+- **App** — shown only when `scope_pattern` is configured and decodes an `app` capture group
+- **Env** — shown only when `scope_pattern` is configured and decodes an `env` capture group
 - **Scope** — Resource group or resource name
 - **Role** — Azure role definition name
 - **Expires In** — Time remaining until activation expires

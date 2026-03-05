@@ -22,7 +22,7 @@ func TestDecodeScopeFields_NoMatch(t *testing.T) {
 
 func TestDecodeScopeFields_FullMatch(t *testing.T) {
 	re := regexp.MustCompile(`^[A-Z]{4}[A-Z]\d(?P<app>[A-Z]{4})(?P<env>[DPQT])`)
-	env, app := DecodeScopeFields("XPABCDEAPP1", re, nil)
+	env, app := DecodeScopeFields("ABCDX1ECOFD", re, nil)
 	if env != "D" || app != "ECOF" {
 		t.Errorf("expected env=D app=ECOF, got env=%q app=%q", env, app)
 	}
@@ -31,7 +31,7 @@ func TestDecodeScopeFields_FullMatch(t *testing.T) {
 func TestDecodeScopeFields_EnvLabels(t *testing.T) {
 	re := regexp.MustCompile(`^[A-Z]{4}[A-Z]\d(?P<app>[A-Z]{4})(?P<env>[DPQT])`)
 	labels := map[string]string{"D": "Dev", "P": "Prod", "Q": "QA", "T": "Test"}
-	env, app := DecodeScopeFields("XPABCDEAPP1", re, labels)
+	env, app := DecodeScopeFields("ABCDX1ECOFD", re, labels)
 	if env != "Dev" || app != "ECOF" {
 		t.Errorf("expected env=Dev app=ECOF, got env=%q app=%q", env, app)
 	}
@@ -40,7 +40,7 @@ func TestDecodeScopeFields_EnvLabels(t *testing.T) {
 func TestDecodeScopeFields_EnvLabelNotInMap(t *testing.T) {
 	re := regexp.MustCompile(`^[A-Z]{4}[A-Z]\d(?P<app>[A-Z]{4})(?P<env>[A-Z])`)
 	labels := map[string]string{"D": "Dev"}
-	env, app := DecodeScopeFields("XPABCDEAPPX", re, labels)
+	env, app := DecodeScopeFields("ABCDX1ECOFX", re, labels)
 	if env != "X" || app != "ECOF" {
 		t.Errorf("expected env=X app=ECOF, got env=%q app=%q", env, app)
 	}
