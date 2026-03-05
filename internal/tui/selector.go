@@ -305,7 +305,7 @@ func (m selectorModel) View() string {
 	}
 
 	if scrollStart > 0 {
-		sb.WriteString(fmt.Sprintf("  %s\n", Dim(fmt.Sprintf("  ↑ %d more above", scrollStart))))
+		fmt.Fprintf(&sb, "  %s\n", Dim(fmt.Sprintf("  ↑ %d more above", scrollStart)))
 	}
 
 	for vi := scrollStart; vi < scrollEnd; vi++ {
@@ -326,11 +326,11 @@ func (m selectorModel) View() string {
 
 	below := total - scrollEnd
 	if below > 0 {
-		sb.WriteString(fmt.Sprintf("  %s\n", Dim(fmt.Sprintf("  ↓ %d more below", below))))
+		fmt.Fprintf(&sb, "  %s\n", Dim(fmt.Sprintf("  ↓ %d more below", below)))
 	}
 
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("  %s\n", Dim(fmt.Sprintf("%d selected", m.selectedCount()))))
+	fmt.Fprintf(&sb, "  %s\n", Dim(fmt.Sprintf("%d selected", m.selectedCount())))
 
 	return sb.String()
 }
