@@ -2,6 +2,22 @@
 
 Activate Azure PIM (Privileged Identity Management) roles from your terminal.
 
+## Context
+
+At work, we use Azure PIM roles to access production resource groups for our applications.
+Because this is company policy, I often need to get into multiple production resource groups at the same time when debugging outages or incidents.
+In the Azure portal, you can only activate one role at a time, and for anyone who has used that flow, each activation plus justification typically takes around two minutes.
+
+This CLI exists to make that operational workflow faster, more repeatable, and less frustrating when time matters.
+
+## Build Transparency
+
+I had never written Go before this project and I am still learning the language.
+I chose Go because it is a native, type-safe language that I have wanted to learn for a long time, and because it is a strong fit for CLI performance.
+
+I also want to be transparent that I did not hand-write all of the code in this repository.
+This project was built using AI-assisted, agentic workflows (sometimes called "vibe coding"), with me steering the architecture, behavior, and quality gates.
+
 ## Features
 
 - Interactive multi-select activation flow with search and bulk-selection shortcuts
