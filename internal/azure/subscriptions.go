@@ -46,7 +46,7 @@ func FetchSubscriptions(ctx context.Context, cred azcore.TokenCredential) ([]Sub
 	if err != nil {
 		return nil, fmt.Errorf("listing subscriptions: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %d listing subscriptions", resp.StatusCode)

@@ -264,21 +264,21 @@ func (m selectorModel) View() string {
 			sb.WriteString("  " + Cyan("🔍 Search: ") + m.search.View() + "\n")
 		} else {
 			total := len(m.visible)
-			sb.WriteString(fmt.Sprintf("  %s %s  %s\n",
+			fmt.Fprintf(&sb, "  %s %s  %s\n",
 				Cyan("🔍 Filter:"),
 				m.search.Value(),
 				Dim(fmt.Sprintf("(%d match(es))", total)),
-			))
+			)
 		}
 		sb.WriteString("\n")
 	}
 
 	// Column header — App/Env columns shown only when a scope_pattern is set
 	if m.showAppEnv {
-		sb.WriteString(fmt.Sprintf("  %s\n", Dim(fmt.Sprintf("    %-4s  %-4s  %-18s  %-30s  %-32s", "App", "Env", "Scope", "Role", "Subscription"))))
+		fmt.Fprintf(&sb, "  %s\n", Dim(fmt.Sprintf("    %-4s  %-4s  %-18s  %-30s  %-32s", "App", "Env", "Scope", "Role", "Subscription")))
 		sb.WriteString("  " + Dim(strings.Repeat("─", 100)) + "\n")
 	} else {
-		sb.WriteString(fmt.Sprintf("  %s\n", Dim(fmt.Sprintf("    %-18s  %-30s  %-32s", "Scope", "Role", "Subscription"))))
+		fmt.Fprintf(&sb, "  %s\n", Dim(fmt.Sprintf("    %-18s  %-30s  %-32s", "Scope", "Role", "Subscription")))
 		sb.WriteString("  " + Dim(strings.Repeat("─", 88)) + "\n")
 	}
 
