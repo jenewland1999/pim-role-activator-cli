@@ -34,7 +34,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build:
-    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    name: Build ${{ matrix.artifact }}
     needs: release
     if: needs.release.outputs.new_release == 'true'
     runs-on: ubuntu-latest
