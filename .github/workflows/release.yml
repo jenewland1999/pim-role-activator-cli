@@ -105,7 +105,7 @@ jobs:
           path: THIRD_PARTY_NOTICES.txt
 
   publish:
-    name: Publish Release
+    name: Publish Release (Draft-First)
     needs: [release, build, licence-report]
     if: needs.release.outputs.new_release == 'true'
     runs-on: ubuntu-latest
@@ -115,16 +115,49 @@ jobs:
         with:
           path: artifacts
 
-      - name: Upload assets to GitHub Release
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ needs.release.outputs.tag }}"
+
+          if gh release view "$tag" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            is_draft="$(gh release view "$tag" --repo "${{ github.repository }}" --json isDraft --jq '.isDraft')"
+            if [ "$is_draft" = "true" ]; then
+              echo "Draft release $tag already exists, reusing it"
+            else
+              echo "Release $tag already exists and is already published."
+              echo "Immutable releases cannot be modified; aborting."
+              exit 1
+            fi
+          else
+            gh release create "$tag" \
+              --repo "${{ github.repository }}" \
+              --title "$tag" \
+              --generate-notes \
+              --draft \
+              --verify-tag
+          fi
+
+      - name: Upload assets to draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${{ needs.release.outputs.tag }}"
           for dir in artifacts/*/; do
             for file in "$dir"*; do
-              echo "Uploading $file to release $tag"
+              echo "Uploading $file to draft release $tag"
               gh release upload "$tag" "$file" \
                 --repo "${{ github.repository }}" \
                 --clobber
             done
           done
+
+      - name: Publish draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ needs.release.outputs.tag }}"
+          gh release edit "$tag" \
+            --repo "${{ github.repository }}" \
+            --draft=false

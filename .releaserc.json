@@ -35,7 +35,6 @@
           ]
         }
       }
-    ],
-    "@semantic-release/github"
+    ]
   ]
 }
