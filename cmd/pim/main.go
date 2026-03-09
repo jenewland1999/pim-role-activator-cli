@@ -176,25 +176,9 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	var allRoles []model.ActiveRole
 	refreshStart := time.Now()
 	if err := tui.RunWithSpinner(spinnerMsg, func() error {
-		g, gctx := errgroup.WithContext(ctx)
-		var mu sync.Mutex
-		for _, sub := range cfg.Subscriptions {
-			g.Go(func() error {
-				clients, e := azure.NewClients(sub.ID, cred)
-				if e != nil {
-					return e
-				}
-				roles, e := azure.FetchActiveRoles(gctx, clients.Active, "/subscriptions/"+sub.ID, sub.Name, justMap, re, cfg.EnvLabels)
-				if e != nil {
-					return e
-				}
-				mu.Lock()
-				allRoles = append(allRoles, roles...)
-				mu.Unlock()
-				return nil
-			})
-		}
-		return g.Wait()
+		var loadErr error
+		allRoles, loadErr = loadActiveRoles(ctx, cfg, cred, justMap)
+		return loadErr
 	}); err != nil {
 		logPhaseTiming("status_refresh_active_roles", refreshStart, "ok", false, "subscription_count", len(cfg.Subscriptions), "cache_hit", cacheHit)
 		if cacheHit {
@@ -598,6 +582,16 @@ activation time. This is also the default command when no subcommand is provided
 		SilenceErrors: true,
 	}
 
+	infoCmd := &cobra.Command{
+		Use:   "info",
+		Short: "List active PIM roles ordered by expiry",
+		Long: `Displays active Azure PIM role assignments across all configured subscriptions,
+sorted by the soonest expiry first with colour cues for roles expiring within 14 days.`,
+		RunE:          runInfo,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+
 	setupCmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Configure the CLI (subscriptions, principal ID, group patterns)",
@@ -622,7 +616,7 @@ Run this to add subscriptions, change your principal ID, or update group-select 
 	rootCmd.PersistentFlags().BoolVar(&debugTimings, "debug-timings", false, "Emit debug timing logs for command stages")
 
 	rootCmd.SetContext(ctx)
-	rootCmd.AddCommand(statusCmd, activateCmd, setupCmd, versionCmd)
+	rootCmd.AddCommand(statusCmd, infoCmd, activateCmd, setupCmd, versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		if errors.Is(err, context.Canceled) {

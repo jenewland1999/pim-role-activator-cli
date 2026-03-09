@@ -9,6 +9,7 @@ var (
 	styleCyan   = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
 	styleGreen  = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
 	styleYellow = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	styleOrange = lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
 	styleRed    = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 
 	styleBoldCyan   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14"))
@@ -39,6 +40,9 @@ func Green(s string) string { return styleGreen.Render(s) }
 
 // Yellow wraps text in yellow.
 func Yellow(s string) string { return styleYellow.Render(s) }
+
+// Orange wraps text in orange.
+func Orange(s string) string { return styleOrange.Render(s) }
 
 // Red wraps text in red.
 func Red(s string) string { return styleRed.Render(s) }
