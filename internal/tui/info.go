@@ -83,9 +83,9 @@ func PrintInfo(roles []model.EligibleRole, showAppEnv bool) {
 
 func groupInfoRoles(roles []model.EligibleRole) []infoGroup {
 	groups := []infoGroup{
-		{title: "Expiring in the next 14 days"},
-		{title: "Expiring from 14 days to 1 quarter"},
-		{title: "Expiring after 1 quarter"},
+		{title: "Expires Within 14 Days"},
+		{title: "Expires Within 1 Quarter"},
+		{title: "Expires After 1 Quarter"},
 	}
 
 	for _, role := range roles {
