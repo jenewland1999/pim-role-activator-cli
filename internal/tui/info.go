@@ -28,11 +28,19 @@ func PrintInfo(roles []model.EligibleRole, showAppEnv bool) {
 		return
 	}
 
+	groups := groupInfoRoles(roles)
+	visibleRoles := countInfoRoles(groups)
+	if visibleRoles == 0 {
+		fmt.Println()
+		fmt.Println("  " + Dim("No eligible PIM role assignments were found."))
+		fmt.Println()
+		return
+	}
+
 	fmt.Println()
-	fmt.Printf("  %s %d eligible PIM role(s), ordered by eligibility expiry:\n", Check, len(roles))
+	fmt.Printf("  %s %d eligible PIM role(s), ordered by eligibility expiry:\n", Check, visibleRoles)
 	fmt.Println()
 
-	groups := groupInfoRoles(roles)
 	for _, group := range groups {
 		if len(group.roles) == 0 {
 			continue
@@ -43,7 +51,7 @@ func PrintInfo(roles []model.EligibleRole, showAppEnv bool) {
 			hdr := fmt.Sprintf("  %-4s │ %-4s │ %-18s │ %-24s │ %-16s │ %-12s │ %-24s",
 				"App", "Env", "Scope", "Role", "Expires", "In", "Subscription")
 			fmt.Println(Bold(hdr))
-			fmt.Println("  " + Dim(strings.Repeat("─", 124)))
+			fmt.Println("  " + Dim(strings.Repeat("─", 120)))
 			for _, r := range group.roles {
 				expiresAt := formatInfoExpiryTimestamp(r.ExpiresAt, r.ExpiresIn)
 				expiresIn := formatInfoExpiryCell(formatInfoExpiryDuration(r.ExpiresAt, r.ExpiresIn), r.ExpiresAt, r.ExpiresIn, 12)
@@ -61,7 +69,7 @@ func PrintInfo(roles []model.EligibleRole, showAppEnv bool) {
 			hdr := fmt.Sprintf("  %-18s │ %-24s │ %-16s │ %-12s │ %-24s",
 				"Scope", "Role", "Expires", "In", "Subscription")
 			fmt.Println(Bold(hdr))
-			fmt.Println("  " + Dim(strings.Repeat("─", 104)))
+			fmt.Println("  " + Dim(strings.Repeat("─", 106)))
 			for _, r := range group.roles {
 				expiresAt := formatInfoExpiryTimestamp(r.ExpiresAt, r.ExpiresIn)
 				expiresIn := formatInfoExpiryCell(formatInfoExpiryDuration(r.ExpiresAt, r.ExpiresIn), r.ExpiresAt, r.ExpiresIn, 12)
@@ -90,6 +98,8 @@ func groupInfoRoles(roles []model.EligibleRole) []infoGroup {
 
 	for _, role := range roles {
 		switch {
+		case role.ExpiresIn <= 0 && !role.ExpiresAt.IsZero():
+			continue
 		case role.ExpiresAt.IsZero() || role.ExpiresIn > infoExpiryQuarterThreshold:
 			groups[2].roles = append(groups[2].roles, role)
 		case role.ExpiresIn > infoExpiryWarningThreshold:
@@ -100,6 +110,14 @@ func groupInfoRoles(roles []model.EligibleRole) []infoGroup {
 	}
 
 	return groups
+}
+
+func countInfoRoles(groups []infoGroup) int {
+	total := 0
+	for _, group := range groups {
+		total += len(group.roles)
+	}
+	return total
 }
 
 func infoExpirySeverity(expiresAt time.Time, expiresIn time.Duration) int {

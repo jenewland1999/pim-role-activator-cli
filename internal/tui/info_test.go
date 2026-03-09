@@ -34,9 +34,10 @@ func TestInfoExpirySeverity(t *testing.T) {
 
 func TestFormatInfoExpiryTimestamp(t *testing.T) {
 	expiresAt := time.Date(2026, time.March, 11, 10, 30, 0, 0, time.UTC)
+	want := expiresAt.Local().Format("2006-01-02 15:04")
 	got := formatInfoExpiryTimestamp(expiresAt, 48*time.Hour)
-	if !strings.Contains(got, "2026-03-11 10:30") {
-		t.Fatalf("formatInfoExpiryTimestamp() = %q, want formatted local timestamp", got)
+	if !strings.Contains(got, want) {
+		t.Fatalf("formatInfoExpiryTimestamp() = %q, want formatted local timestamp containing %q", got, want)
 	}
 }
 
@@ -95,6 +96,7 @@ func TestGroupInfoRoles(t *testing.T) {
 		{Role: model.Role{RoleName: "Quarter"}, ExpiresAt: now.Add(30 * 24 * time.Hour), ExpiresIn: 30 * 24 * time.Hour},
 		{Role: model.Role{RoleName: "Later"}, ExpiresAt: now.Add(120 * 24 * time.Hour), ExpiresIn: 120 * 24 * time.Hour},
 		{Role: model.Role{RoleName: "Never"}},
+		{Role: model.Role{RoleName: "Expired"}, ExpiresAt: now.Add(-24 * time.Hour), ExpiresIn: 0},
 	}
 
 	groups := groupInfoRoles(roles)
@@ -106,5 +108,8 @@ func TestGroupInfoRoles(t *testing.T) {
 	}
 	if len(groups[2].roles) != 2 {
 		t.Fatalf("group[2] len = %d, want 2", len(groups[2].roles))
+	}
+	if countInfoRoles(groups) != 4 {
+		t.Fatalf("countInfoRoles(groups) = %d, want 4", countInfoRoles(groups))
 	}
 }
