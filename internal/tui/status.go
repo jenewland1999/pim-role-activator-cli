@@ -8,11 +8,6 @@ import (
 	"github.com/jenewland1999/pim-role-activator-cli/internal/model"
 )
 
-const (
-	infoExpiryWarningThreshold = 14 * 24 * time.Hour
-	infoExpiryUrgentThreshold  = 7 * 24 * time.Hour
-)
-
 // PrintBanner prints the PIM CLI header banner.
 func PrintBanner(dryRun bool) {
 	fmt.Println()
@@ -34,61 +29,6 @@ func PrintStatus(roles []model.ActiveRole, showAppEnv bool) {
 // PrintCachedStatus renders the active-roles table with a "(cached)" indicator.
 func PrintCachedStatus(roles []model.ActiveRole, showAppEnv bool) {
 	printStatusTable(roles, showAppEnv, true)
-}
-
-// PrintInfo renders active roles ordered by expiry with exact expiry timestamps.
-func PrintInfo(roles []model.ActiveRole, showAppEnv bool, now time.Time) {
-	if len(roles) == 0 {
-		fmt.Println()
-		fmt.Println("  " + Dim("No PIM roles are currently active."))
-		fmt.Println("  " + Dim("Run ") + Bold("pim activate") + Dim(" to activate roles."))
-		fmt.Println()
-		return
-	}
-
-	fmt.Println()
-	fmt.Printf("  %s %d active PIM role(s), ordered by expiry:\n", Check, len(roles))
-	fmt.Println()
-
-	if showAppEnv {
-		hdr := fmt.Sprintf("  %-4s │ %-4s │ %-18s │ %-24s │ %-16s │ %-10s │ %-24s",
-			"App", "Env", "Scope", "Role", "Expires", "In", "Subscription")
-		fmt.Println(Bold(hdr))
-		fmt.Println("  " + Dim(strings.Repeat("─", 122)))
-		for _, r := range roles {
-			expiresAt := formatInfoExpiryTimestamp(now, r.ExpiresIn)
-			expiresIn := formatInfoExpiryCell(FormatExpiryDuration(r.ExpiresIn), r.ExpiresIn, 10)
-			fmt.Printf("  %-4s │ %-4s │ %-18s │ %-24s │ %s │ %s │ %-24s\n",
-				displayOrDash(r.AppCode),
-				displayOrDash(r.Environment),
-				Truncate(r.ScopeName, 18),
-				Truncate(r.RoleName, 24),
-				expiresAt,
-				expiresIn,
-				Truncate(r.SubscriptionName, 24),
-			)
-		}
-	} else {
-		hdr := fmt.Sprintf("  %-18s │ %-24s │ %-16s │ %-10s │ %-24s",
-			"Scope", "Role", "Expires", "In", "Subscription")
-		fmt.Println(Bold(hdr))
-		fmt.Println("  " + Dim(strings.Repeat("─", 102)))
-		for _, r := range roles {
-			expiresAt := formatInfoExpiryTimestamp(now, r.ExpiresIn)
-			expiresIn := formatInfoExpiryCell(FormatExpiryDuration(r.ExpiresIn), r.ExpiresIn, 10)
-			fmt.Printf("  %-18s │ %-24s │ %s │ %s │ %-24s\n",
-				Truncate(r.ScopeName, 18),
-				Truncate(r.RoleName, 24),
-				expiresAt,
-				expiresIn,
-				Truncate(r.SubscriptionName, 24),
-			)
-		}
-	}
-
-	fmt.Println()
-	fmt.Println("  " + Dim("Red: expires within 7 days. Orange: expires within 14 days."))
-	fmt.Println()
 }
 
 func printStatusTable(roles []model.ActiveRole, showAppEnv bool, cached bool) {
@@ -233,37 +173,6 @@ func displayOrDash(value string) string {
 		return "—"
 	}
 	return value
-}
-
-func expirySeverity(expiresIn time.Duration) int {
-	switch {
-	case expiresIn <= infoExpiryUrgentThreshold:
-		return 2
-	case expiresIn <= infoExpiryWarningThreshold:
-		return 1
-	default:
-		return 0
-	}
-}
-
-func formatInfoExpiryCell(value string, expiresIn time.Duration, width int) string {
-	cell := fmt.Sprintf("%-*s", width, value)
-	switch expirySeverity(expiresIn) {
-	case 2:
-		return Red(cell)
-	case 1:
-		return Orange(cell)
-	default:
-		return cell
-	}
-}
-
-func formatInfoExpiryTimestamp(now time.Time, expiresIn time.Duration) string {
-	if expiresIn <= 0 {
-		return formatInfoExpiryCell("expired", expiresIn, 16)
-	}
-	localExpiry := now.Add(expiresIn).Local().Format("2006-01-02 15:04")
-	return formatInfoExpiryCell(localExpiry, expiresIn, 16)
 }
 
 // FormatExpiryDuration converts a time.Duration to a concise human string.
