@@ -22,6 +22,7 @@ This project was built using AI-assisted, agentic workflows (sometimes called "v
 
 - Interactive multi-select activation flow with search and bulk-selection shortcuts
 - Status view for active assignments with remaining time and local justification history
+- Eligibility-expiry view for activatable roles across subscriptions
 - Parallel role activation with bounded concurrency
 - Eligible-role cache with configurable TTL and active-role cache with dynamic expiry
 - Dry-run activation mode (`pim activate --dry-run`)
@@ -66,6 +67,7 @@ pim activate
 ```text
 pim                 Show currently active PIM roles (default)
 pim status          Show currently active PIM roles
+pim info            Show eligible PIM roles ordered by eligibility expiry
 pim activate        Activate eligible PIM roles interactively
 pim completion      Generate shell completion scripts
 pim setup           Re-run the configuration wizard

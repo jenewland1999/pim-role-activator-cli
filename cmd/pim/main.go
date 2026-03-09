@@ -26,6 +26,7 @@ import (
 	"github.com/jenewland1999/pim-role-activator-cli/internal/cache"
 	"github.com/jenewland1999/pim-role-activator-cli/internal/config"
 	"github.com/jenewland1999/pim-role-activator-cli/internal/model"
+	"github.com/jenewland1999/pim-role-activator-cli/internal/report"
 	"github.com/jenewland1999/pim-role-activator-cli/internal/setup"
 	"github.com/jenewland1999/pim-role-activator-cli/internal/state"
 	"github.com/jenewland1999/pim-role-activator-cli/internal/tui"
@@ -177,7 +178,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	refreshStart := time.Now()
 	if err := tui.RunWithSpinner(spinnerMsg, func() error {
 		var loadErr error
-		allRoles, loadErr = loadActiveRoles(ctx, cfg, cred, justMap)
+		allRoles, loadErr = report.LoadActiveRoles(ctx, cfg, cred, justMap)
 		return loadErr
 	}); err != nil {
 		logPhaseTiming("status_refresh_active_roles", refreshStart, "ok", false, "subscription_count", len(cfg.Subscriptions), "cache_hit", cacheHit)
@@ -209,6 +210,62 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		tui.PrintStatus(allRoles, showAppEnv)
 	}
 	logPhaseTiming("status_total", cmdStart, "cache_hit", cacheHit, "subscriptions", len(cfg.Subscriptions), "active_roles", len(allRoles))
+	return nil
+}
+
+func runInfo(cmd *cobra.Command, _ []string) error {
+	cmdStart := time.Now()
+	ctx, cancel := context.WithTimeout(cmd.Context(), apiTimeout)
+	defer cancel()
+	dir := pimDir()
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if len(cfg.Subscriptions) == 0 {
+		return fmt.Errorf("no subscriptions configured — run 'pim setup' to configure your subscriptions")
+	}
+
+	re, reErr := cfg.ParsedScopePattern()
+	if reErr != nil {
+		return fmt.Errorf("invalid scope_pattern in config: %w", reErr)
+	}
+	showAppEnv := re != nil
+
+	tui.PrintBanner(false)
+
+	var cred azcore.TokenCredential
+	authStart := time.Now()
+	if err := tui.RunWithSpinner("Authenticating with Azure…", func() error {
+		var credErr error
+		cred, credErr = azure.NewCredential()
+		return credErr
+	}); err != nil {
+		logPhaseTiming("info_auth", authStart, "ok", false)
+		return fmt.Errorf("%s %w", tui.Cross, err)
+	}
+	logPhaseTiming("info_auth", authStart, "ok", true)
+
+	maybePrintIdentity(ctx, cred, "info")
+
+	var roles []model.EligibleRole
+	fetchStart := time.Now()
+	if err := tui.RunWithSpinner("Fetching eligible PIM roles…", func() error {
+		var loadErr error
+		roles, loadErr = report.LoadEligibleRoleExpiries(ctx, cfg, cred)
+		return loadErr
+	}); err != nil {
+		logPhaseTiming("info_fetch_eligible_roles", fetchStart, "ok", false, "subscription_count", len(cfg.Subscriptions))
+		return fmt.Errorf("%s Failed to fetch eligible role assignments: %w", tui.Cross, err)
+	}
+	logPhaseTiming("info_fetch_eligible_roles", fetchStart, "ok", true, "subscription_count", len(cfg.Subscriptions), "eligible_roles", len(roles))
+
+	report.SortEligibleRolesByExpiry(roles)
+	tui.PrintInfo(roles, showAppEnv)
+
+	logPhaseTiming("info_total", cmdStart, "subscriptions", len(cfg.Subscriptions), "eligible_roles", len(roles))
 	return nil
 }
 
@@ -584,9 +641,9 @@ activation time. This is also the default command when no subcommand is provided
 
 	infoCmd := &cobra.Command{
 		Use:   "info",
-		Short: "List active PIM roles ordered by expiry",
-		Long: `Displays active Azure PIM role assignments across all configured subscriptions,
-sorted by the soonest expiry first with colour cues for roles expiring within 14 days.`,
+		Short: "List eligible PIM roles ordered by eligibility expiry",
+		Long: `Displays eligible Azure PIM role assignments across all configured subscriptions,
+sorted by the soonest eligibility expiry first with colour cues for roles that are about to stop being activatable.`,
 		RunE:          runInfo,
 		SilenceUsage:  true,
 		SilenceErrors: true,

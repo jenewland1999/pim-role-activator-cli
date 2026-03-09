@@ -24,6 +24,14 @@ type Role struct {
 	Selected bool
 }
 
+// EligibleRole holds an activatable PIM role assignment together with the
+// expiry of the eligibility window itself.
+type EligibleRole struct {
+	Role
+	ExpiresAt time.Time
+	ExpiresIn time.Duration
+}
+
 // ActiveRole holds the display data for a currently active PIM role.
 type ActiveRole struct {
 	RoleName         string
