@@ -67,7 +67,7 @@ pim activate
 ```text
 pim                 Show currently active PIM roles (default)
 pim status          Show currently active PIM roles
-pim info            Show eligible PIM roles ordered by eligibility expiry
+pim eligible        Show eligible PIM roles ordered by eligibility expiry
 pim activate        Activate eligible PIM roles interactively
 pim completion      Generate shell completion scripts
 pim setup           Re-run the configuration wizard

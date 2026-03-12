@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -9,18 +10,20 @@ import (
 )
 
 const (
-	infoExpiryWarningThreshold = 14 * 24 * time.Hour
-	infoExpiryUrgentThreshold  = 7 * 24 * time.Hour
-	infoExpiryQuarterThreshold = 90 * 24 * time.Hour
+	eligibleExpiryWarningThreshold = 14 * 24 * time.Hour
+	eligibleExpiryUrgentThreshold  = 7 * 24 * time.Hour
+	eligibleExpiryQuarterThreshold = 90 * 24 * time.Hour
 )
 
-type infoGroup struct {
+type eligibleGroup struct {
 	title string
 	roles []model.EligibleRole
 }
 
-// PrintInfo renders eligible roles ordered by eligibility expiry.
-func PrintInfo(roles []model.EligibleRole, showAppEnv bool) {
+// PrintEligible renders eligible roles ordered by eligibility expiry.
+func PrintEligible(roles []model.EligibleRole, showAppEnv bool) {
+	roles = sortEligibleRolesByExpiry(roles)
+
 	if len(roles) == 0 {
 		fmt.Println()
 		fmt.Println("  " + Dim("No eligible PIM role assignments were found."))
@@ -28,8 +31,8 @@ func PrintInfo(roles []model.EligibleRole, showAppEnv bool) {
 		return
 	}
 
-	groups := groupInfoRoles(roles)
-	visibleRoles := countInfoRoles(groups)
+	groups := groupEligibleRoles(roles)
+	visibleRoles := countEligibleRoles(groups)
 	if visibleRoles == 0 {
 		fmt.Println()
 		fmt.Println("  " + Dim("No eligible PIM role assignments were found."))
@@ -53,8 +56,8 @@ func PrintInfo(roles []model.EligibleRole, showAppEnv bool) {
 			fmt.Println(Bold(hdr))
 			fmt.Println("  " + Dim(strings.Repeat("─", 120)))
 			for _, r := range group.roles {
-				expiresAt := formatInfoExpiryTimestamp(r.ExpiresAt, r.ExpiresIn)
-				expiresIn := formatInfoExpiryCell(formatInfoExpiryDuration(r.ExpiresAt, r.ExpiresIn), r.ExpiresAt, r.ExpiresIn, 12)
+				expiresAt := formatEligibleExpiryTimestamp(r.ExpiresAt, r.ExpiresIn)
+				expiresIn := formatEligibleExpiryCell(formatEligibleExpiryDuration(r.ExpiresAt, r.ExpiresIn), r.ExpiresAt, r.ExpiresIn, 12)
 				fmt.Printf("  %-4s │ %-4s │ %-18s │ %-24s │ %s │ %s │ %-24s\n",
 					displayOrDash(r.AppCode),
 					displayOrDash(r.Environment),
@@ -71,8 +74,8 @@ func PrintInfo(roles []model.EligibleRole, showAppEnv bool) {
 			fmt.Println(Bold(hdr))
 			fmt.Println("  " + Dim(strings.Repeat("─", 106)))
 			for _, r := range group.roles {
-				expiresAt := formatInfoExpiryTimestamp(r.ExpiresAt, r.ExpiresIn)
-				expiresIn := formatInfoExpiryCell(formatInfoExpiryDuration(r.ExpiresAt, r.ExpiresIn), r.ExpiresAt, r.ExpiresIn, 12)
+				expiresAt := formatEligibleExpiryTimestamp(r.ExpiresAt, r.ExpiresIn)
+				expiresIn := formatEligibleExpiryCell(formatEligibleExpiryDuration(r.ExpiresAt, r.ExpiresIn), r.ExpiresAt, r.ExpiresIn, 12)
 				fmt.Printf("  %-18s │ %-24s │ %s │ %s │ %-24s\n",
 					Truncate(r.ScopeName, 18),
 					Truncate(r.RoleName, 24),
@@ -89,20 +92,22 @@ func PrintInfo(roles []model.EligibleRole, showAppEnv bool) {
 	fmt.Println()
 }
 
-func groupInfoRoles(roles []model.EligibleRole) []infoGroup {
-	groups := []infoGroup{
+func groupEligibleRoles(roles []model.EligibleRole) []eligibleGroup {
+	roles = sortEligibleRolesByExpiry(roles)
+
+	groups := []eligibleGroup{
 		{title: "Expires Within 14 Days"},
 		{title: "Expires Within 1 Quarter"},
-		{title: "Expires After 1 Quarter"},
+		{title: "Expires After 1 Quarter or Never"},
 	}
 
 	for _, role := range roles {
 		switch {
 		case role.ExpiresIn <= 0 && !role.ExpiresAt.IsZero():
 			continue
-		case role.ExpiresAt.IsZero() || role.ExpiresIn > infoExpiryQuarterThreshold:
+		case role.ExpiresAt.IsZero() || role.ExpiresIn > eligibleExpiryQuarterThreshold:
 			groups[2].roles = append(groups[2].roles, role)
-		case role.ExpiresIn > infoExpiryWarningThreshold:
+		case role.ExpiresIn > eligibleExpiryWarningThreshold:
 			groups[1].roles = append(groups[1].roles, role)
 		default:
 			groups[0].roles = append(groups[0].roles, role)
@@ -112,7 +117,27 @@ func groupInfoRoles(roles []model.EligibleRole) []infoGroup {
 	return groups
 }
 
-func countInfoRoles(groups []infoGroup) int {
+func sortEligibleRolesByExpiry(roles []model.EligibleRole) []model.EligibleRole {
+	sorted := append([]model.EligibleRole(nil), roles...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		left := sorted[i].ExpiresAt
+		right := sorted[j].ExpiresAt
+
+		switch {
+		case left.IsZero() && right.IsZero():
+			return false
+		case left.IsZero():
+			return false
+		case right.IsZero():
+			return true
+		default:
+			return left.Before(right)
+		}
+	})
+	return sorted
+}
+
+func countEligibleRoles(groups []eligibleGroup) int {
 	total := 0
 	for _, group := range groups {
 		total += len(group.roles)
@@ -120,23 +145,23 @@ func countInfoRoles(groups []infoGroup) int {
 	return total
 }
 
-func infoExpirySeverity(expiresAt time.Time, expiresIn time.Duration) int {
+func eligibleExpirySeverity(expiresAt time.Time, expiresIn time.Duration) int {
 	if expiresAt.IsZero() {
 		return 0
 	}
 	switch {
-	case expiresIn <= infoExpiryUrgentThreshold:
+	case expiresIn <= eligibleExpiryUrgentThreshold:
 		return 2
-	case expiresIn <= infoExpiryWarningThreshold:
+	case expiresIn <= eligibleExpiryWarningThreshold:
 		return 1
 	default:
 		return 0
 	}
 }
 
-func formatInfoExpiryCell(value string, expiresAt time.Time, expiresIn time.Duration, width int) string {
+func formatEligibleExpiryCell(value string, expiresAt time.Time, expiresIn time.Duration, width int) string {
 	cell := fmt.Sprintf("%-*s", width, value)
-	switch infoExpirySeverity(expiresAt, expiresIn) {
+	switch eligibleExpirySeverity(expiresAt, expiresIn) {
 	case 2:
 		return Red(cell)
 	case 1:
@@ -146,17 +171,17 @@ func formatInfoExpiryCell(value string, expiresAt time.Time, expiresIn time.Dura
 	}
 }
 
-func formatInfoExpiryTimestamp(expiresAt time.Time, expiresIn time.Duration) string {
+func formatEligibleExpiryTimestamp(expiresAt time.Time, expiresIn time.Duration) string {
 	if expiresAt.IsZero() {
-		return formatInfoExpiryCell("never", expiresAt, expiresIn, 16)
+		return formatEligibleExpiryCell("never", expiresAt, expiresIn, 16)
 	}
 	if expiresIn <= 0 {
-		return formatInfoExpiryCell("expired", expiresAt, expiresIn, 16)
+		return formatEligibleExpiryCell("expired", expiresAt, expiresIn, 16)
 	}
-	return formatInfoExpiryCell(expiresAt.Local().Format("2006-01-02 15:04"), expiresAt, expiresIn, 16)
+	return formatEligibleExpiryCell(expiresAt.Local().Format("2006-01-02 15:04"), expiresAt, expiresIn, 16)
 }
 
-func formatInfoExpiryDuration(expiresAt time.Time, expiresIn time.Duration) string {
+func formatEligibleExpiryDuration(expiresAt time.Time, expiresIn time.Duration) string {
 	if expiresAt.IsZero() {
 		return "never"
 	}

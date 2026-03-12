@@ -213,7 +213,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func runInfo(cmd *cobra.Command, _ []string) error {
+func runEligible(cmd *cobra.Command, _ []string) error {
 	cmdStart := time.Now()
 	ctx, cancel := context.WithTimeout(cmd.Context(), apiTimeout)
 	defer cancel()
@@ -243,12 +243,12 @@ func runInfo(cmd *cobra.Command, _ []string) error {
 		cred, credErr = azure.NewCredential()
 		return credErr
 	}); err != nil {
-		logPhaseTiming("info_auth", authStart, "ok", false)
+		logPhaseTiming("eligible_auth", authStart, "ok", false)
 		return fmt.Errorf("%s %w", tui.Cross, err)
 	}
-	logPhaseTiming("info_auth", authStart, "ok", true)
+	logPhaseTiming("eligible_auth", authStart, "ok", true)
 
-	maybePrintIdentity(ctx, cred, "info")
+	maybePrintIdentity(ctx, cred, "eligible")
 
 	var roles []model.EligibleRole
 	fetchStart := time.Now()
@@ -257,15 +257,15 @@ func runInfo(cmd *cobra.Command, _ []string) error {
 		roles, loadErr = report.LoadEligibleRoleExpiries(ctx, cfg, cred)
 		return loadErr
 	}); err != nil {
-		logPhaseTiming("info_fetch_eligible_roles", fetchStart, "ok", false, "subscription_count", len(cfg.Subscriptions))
+		logPhaseTiming("eligible_fetch_roles", fetchStart, "ok", false, "subscription_count", len(cfg.Subscriptions))
 		return fmt.Errorf("%s Failed to fetch eligible role assignments: %w", tui.Cross, err)
 	}
-	logPhaseTiming("info_fetch_eligible_roles", fetchStart, "ok", true, "subscription_count", len(cfg.Subscriptions), "eligible_roles", len(roles))
+	logPhaseTiming("eligible_fetch_roles", fetchStart, "ok", true, "subscription_count", len(cfg.Subscriptions), "eligible_roles", len(roles))
 
 	report.SortEligibleRolesByExpiry(roles)
-	tui.PrintInfo(roles, showAppEnv)
+	tui.PrintEligible(roles, showAppEnv)
 
-	logPhaseTiming("info_total", cmdStart, "subscriptions", len(cfg.Subscriptions), "eligible_roles", len(roles))
+	logPhaseTiming("eligible_total", cmdStart, "subscriptions", len(cfg.Subscriptions), "eligible_roles", len(roles))
 	return nil
 }
 
@@ -639,12 +639,12 @@ activation time. This is also the default command when no subcommand is provided
 		SilenceErrors: true,
 	}
 
-	infoCmd := &cobra.Command{
-		Use:   "info",
+	eligibleCmd := &cobra.Command{
+		Use:   "eligible",
 		Short: "List eligible PIM roles ordered by eligibility expiry",
 		Long: `Displays eligible Azure PIM role assignments across all configured subscriptions,
 sorted by the soonest eligibility expiry first with colour cues for roles that are about to stop being activatable.`,
-		RunE:          runInfo,
+		RunE:          runEligible,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -673,7 +673,7 @@ Run this to add subscriptions, change your principal ID, or update group-select 
 	rootCmd.PersistentFlags().BoolVar(&debugTimings, "debug-timings", false, "Emit debug timing logs for command stages")
 
 	rootCmd.SetContext(ctx)
-	rootCmd.AddCommand(statusCmd, infoCmd, activateCmd, setupCmd, versionCmd)
+	rootCmd.AddCommand(statusCmd, eligibleCmd, activateCmd, setupCmd, versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		if errors.Is(err, context.Canceled) {
