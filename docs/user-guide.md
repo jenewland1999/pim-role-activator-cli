@@ -110,6 +110,22 @@ When `scope_pattern` is not configured, output uses a simpler table without App/
 
 ---
 
+### `pim eligible` — Show Eligible Roles
+
+Running `pim eligible` shows activatable PIM roles ordered by the soonest
+eligibility expiry first, with colour cues for roles that are about to stop
+being activatable.
+
+Roles are grouped into:
+
+- Expires Within 14 Days
+- Expires Within 1 Quarter
+- Expires After 1 Quarter or Never
+
+Expired eligibilities are filtered out of this view.
+
+---
+
 ### `pim activate` — Activate Roles
 
 Interactive 3-step workflow:
